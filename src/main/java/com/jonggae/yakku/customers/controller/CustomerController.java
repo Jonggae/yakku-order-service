@@ -16,6 +16,7 @@ public class CustomerController {
 
     private final CustomerService customerService;
 
+    //todo: 회원가입 상황에 대응한 예외 처리 작성하기 message 처리하기
     @PostMapping("/register")
     public ResponseEntity<ApiResponseDto<CustomerDto>> register(@RequestBody CustomerDto requestDto) {
         CustomerDto registerdCustomerDto = customerService.register(requestDto);
