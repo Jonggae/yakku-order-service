@@ -1,44 +1,66 @@
 package com.jonggae.yakku.customers.service;
 
 import com.jonggae.yakku.address.Address;
-import com.jonggae.yakku.customers.dto.CustomerDto;
+import com.jonggae.yakku.customers.dto.CustomerRequestDto;
+import com.jonggae.yakku.customers.dto.CustomerResponseDto;
 import com.jonggae.yakku.customers.entity.Customer;
 import com.jonggae.yakku.customers.repository.CustomerRepository;
 import com.jonggae.yakku.exceptions.DuplicateCustomerException;
+import com.jonggae.yakku.mailVerification.service.MailService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class CustomerService {
+    private static final Logger logger = LoggerFactory.getLogger(CustomerService.class);
 
     private final CustomerRepository customerRepository;
     private final PasswordEncoder passwordEncoder;
+    private final MailService mailService;
+    private final TokenService tokenService;
 
-    public CustomerDto register(CustomerDto customerDto) {
+    public void register(CustomerRequestDto customerRequestDto) {
+        checkCustomerInfo(customerRequestDto.getCustomerName(), customerRequestDto.getEmail());
 
-        checkCustomerInfo(customerDto.getCustomerName(), customerDto.getEmail());
-
-        Address address = Address.builder()
-                .address(customerDto.getAddress())
-                .addressDetail(customerDto.getAddressDetail())
-                .build();
-
-        Customer customer = Customer.builder()
-                .customerName(customerDto.getCustomerName())
-                .password(passwordEncoder.encode(customerDto.getPassword()))
-                .email(customerDto.getEmail())
-                .address(address)
-                .build();
-
-        customerRepository.save(customer);
-
-        return CustomerDto.from(customer);
+        String token = tokenService.createToken(customerRequestDto.getEmail(), customerRequestDto);
+        mailService.sendMail(customerRequestDto.getEmail(), token);
     }
 
+    public CustomerResponseDto confirmCustomer(String token) {
+        CustomerRequestDto customerRequestDto = tokenService.getUserDetailsByToken(token);
+        logger.debug("Retrieved CustomerResponseDto from token: {}", customerRequestDto);
+
+        if (customerRequestDto != null) {
+
+            Address address = Address.builder()
+                    .address(customerRequestDto.getAddress())
+                    .addressDetail(customerRequestDto.getAddressDetail())
+                    .build();
+
+            Customer customer = Customer.builder()
+                    .customerName(customerRequestDto.getCustomerName())
+                    .password(passwordEncoder.encode(customerRequestDto.getPassword()))
+                    .email(customerRequestDto.getEmail())
+                    .address(address)
+                    .enabled(true)
+                    .build();
+
+            customerRepository.save(customer);
+            tokenService.deleteToken(token);
+            return CustomerResponseDto.from(customer);
+
+        } else {
+            throw new IllegalStateException("유효하지 않거나 만료된 인증 확인입니다.");
+        }
+    }
+
+
     //todo: 시큐리티 구현 후 다시 작성
-    public CustomerDto getMyPage() {
+    public CustomerResponseDto getMyPage() {
         return null;
     }
 
