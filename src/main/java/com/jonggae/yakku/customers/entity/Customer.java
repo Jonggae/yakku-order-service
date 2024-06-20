@@ -17,12 +17,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "customers")
-/*
- * username,
- * password,
- * email
- * created_at
- * updated_at*/
+
 public class Customer {
 
     @Id

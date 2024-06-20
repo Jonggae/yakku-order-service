@@ -19,6 +19,8 @@ public class CustomerDto {
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY) //보안관련 직렬화,역직렬화
     private String password;
     private String email;
+    private String address;
+    private String addressDetail;
 
     public static CustomerDto from(Customer customer) {
 
@@ -26,6 +28,8 @@ public class CustomerDto {
                 .id(customer.getId())
                 .customerName(customer.getCustomerName())
                 .email(customer.getEmail())
+                .address(customer.getAddress().getAddress())
+                .addressDetail(customer.getAddress().getAddressDetail())
                 .build();
 
     }

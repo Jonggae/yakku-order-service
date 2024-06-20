@@ -1,5 +1,6 @@
 package com.jonggae.yakku.customers.service;
 
+import com.jonggae.yakku.address.Address;
 import com.jonggae.yakku.customers.dto.CustomerDto;
 import com.jonggae.yakku.customers.entity.Customer;
 import com.jonggae.yakku.customers.repository.CustomerRepository;
@@ -16,14 +17,22 @@ public class CustomerService {
     private final PasswordEncoder passwordEncoder;
 
     public CustomerDto register(CustomerDto customerDto) {
+
         checkCustomerInfo(customerDto.getCustomerName(), customerDto.getEmail());
+
+        Address address = Address.builder()
+                .address(customerDto.getAddress())
+                .addressDetail(customerDto.getAddressDetail())
+                .build();
+
         Customer customer = Customer.builder()
                 .customerName(customerDto.getCustomerName())
                 .password(passwordEncoder.encode(customerDto.getPassword()))
                 .email(customerDto.getEmail())
+                .address(address)
                 .build();
 
-        customer = customerRepository.save(customer);
+        customerRepository.save(customer);
 
         return CustomerDto.from(customer);
     }
@@ -34,7 +43,7 @@ public class CustomerService {
     }
 
     private void checkCustomerInfo(String customerName, String email) {
-        if (customerRepository.findByCustomerName(customerName).isPresent()){
+        if (customerRepository.findByCustomerName(customerName).isPresent()) {
             throw new DuplicateCustomerException("이미 가입된 이름입니다.");
         }
         if (customerRepository.findByEmail(email).isPresent()) {

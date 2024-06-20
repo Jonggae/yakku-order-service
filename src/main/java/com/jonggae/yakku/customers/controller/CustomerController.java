@@ -26,6 +26,8 @@ public class CustomerController {
     //todo: 시큐리티 구현 후 작성
     @GetMapping("/my-page")
     public ResponseEntity<ApiResponseDto<CustomerDto>> myPage() {
-        return null;
+        CustomerDto getCustomerDto = customerService.getMyPage();
+        String message = "회원 정보";
+        return ApiResponseUtil.success(message, getCustomerDto, 200);
     }
 }
