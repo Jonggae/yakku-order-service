@@ -19,8 +19,7 @@ import java.util.concurrent.TimeUnit;
 @AllArgsConstructor
 public class TokenService {
 
-    private static final Logger logger = LoggerFactory.getLogger(TokenService.class);
-    private static final Duration TOKEN_TTL = Duration.ofDays(1);
+    private static final Duration TOKEN_TTL = Duration.ofMinutes(10);
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper;
 
@@ -29,10 +28,8 @@ public class TokenService {
         try {
             String customerDtoString = objectMapper.writeValueAsString(customerDto);
             redisTemplate.opsForValue().set(token, customerDtoString, TOKEN_TTL.toMillis(), TimeUnit.MILLISECONDS);
-            logger.debug("Token created: {} for email: {}", token, mail);
 
         } catch (JsonProcessingException e) {
-            logger.error("Error serializing CustomerResponseDto for token creation: {}", e.getMessage(), e);
             throw new RuntimeException("Unable to serialize CustomerResponseDto", e);
         }
         return token;
@@ -43,7 +40,6 @@ public class TokenService {
         try {
             return objectMapper.readValue(customerDtoString, CustomerRequestDto.class);
         } catch (JsonProcessingException e) {
-            logger.error("Error deserializing CustomerResponseDto for token: {}", token, e);
             throw new RuntimeException("Unable to deserialize CustomerResponseDto", e);
         }
     }
