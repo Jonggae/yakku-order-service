@@ -1,4 +1,4 @@
-package com.jonggae.yakku.common;
+package com.jonggae.yakku.common.apiResponse;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
