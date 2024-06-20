@@ -13,8 +13,20 @@ services:
     networks:
       - my_network
 
+  redis:
+    image: "redis:latest"
+    container_name: "redis_container"
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - my_network
+
+
 volumes:
   mysql_data:
+  redis_data:
 
 networks:
   my_network:

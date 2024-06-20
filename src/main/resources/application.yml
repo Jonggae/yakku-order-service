@@ -27,5 +27,5 @@ spring:
               enable: true
   data:
     redis:
-      host: localhost
+      host: redis_container
       port: 6379
