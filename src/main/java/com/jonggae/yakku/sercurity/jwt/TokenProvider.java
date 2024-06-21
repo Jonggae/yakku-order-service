@@ -18,7 +18,6 @@ import java.security.Key;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Component
@@ -40,7 +39,7 @@ public class TokenProvider implements InitializingBean {
             @Value("${jwt.refresh_expiration_time}") long refreshTokenExpirationTime) {
         this.secretKey = secretKey;
         this.refreshSecretKey = refreshSecretKey;
-        this.tokenExpirationTime = tokenExpirationTime * 1000; //86400초 = 24H
+        this.tokenExpirationTime = tokenExpirationTime * 1000; //테스트 중이므로 아주 짧게 지정해놨음.
         this.refreshTokenExpirationTime = refreshTokenExpirationTime * 1000; // 예: 604800초 = 7일
     }
 
@@ -53,7 +52,8 @@ public class TokenProvider implements InitializingBean {
         this.refreshKey = Keys.hmacShaKeyFor(refreshKeyBytes);
     }
 
-    public String createToken(Authentication authentication) {
+    // 액세스 토큰을 생성함
+    public String createAccessToken(Authentication authentication) {
         String authorities = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.joining(","));
@@ -68,13 +68,13 @@ public class TokenProvider implements InitializingBean {
                 .setExpiration(validity)
                 .compact();
     }
-
-    public String createRefreshToken() {
+    // 리프래시 토큰을 생성함
+    public String createRefreshToken(Authentication authentication) {
         long now = (new Date()).getTime();
         Date validity = new Date(now + this.refreshTokenExpirationTime);
 
         return Jwts.builder()
-                .setSubject(UUID.randomUUID().toString())
+                .setSubject(authentication.getName())
                 .signWith(refreshKey, SignatureAlgorithm.HS512)
                 .setExpiration(validity)
                 .compact();
@@ -98,12 +98,34 @@ public class TokenProvider implements InitializingBean {
         return new UsernamePasswordAuthenticationToken(principal, token, authorities);
     }
 
+    public Authentication getAuthenticationFromRefreshToken(String refreshToken) {
+        Claims claims = Jwts
+                .parserBuilder()
+                .setSigningKey(refreshKey)
+                .build()
+                .parseClaimsJws(refreshToken)
+                .getBody();
+
+        User principal = new User(claims.getSubject(), "", Arrays.asList(new SimpleGrantedAuthority("ROLE_USER")));
+
+        return new UsernamePasswordAuthenticationToken(principal, refreshToken, principal.getAuthorities());
+    }
+
+    public String getCustomerNameFromToken(String token) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(refreshKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+        return claims.getSubject();
+    }
+
     public boolean validateToken(String token) {
         try {
             Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
             return true;
         } catch (io.jsonwebtoken.security.SecurityException | MalformedJwtException e) {
-            logger.info("잘못된 JWT 서명입니다.");
+            logger.info("잘못된 AccessToken 서명입니다.");
         } catch (ExpiredJwtException e) {
             logger.info("만료된 JWT 토큰입니다.");
         } catch (UnsupportedJwtException e) {
@@ -119,7 +141,7 @@ public class TokenProvider implements InitializingBean {
             Jwts.parserBuilder().setSigningKey(refreshKey).build().parseClaimsJws(token);
             return true;
         } catch (io.jsonwebtoken.security.SecurityException | MalformedJwtException e) {
-            logger.info("잘못된 JWT 서명입니다.");
+            logger.info("잘못된 RefreshToken 서명입니다.");
         } catch (ExpiredJwtException e) {
             logger.info("만료된 JWT 리프레시 토큰입니다.");
         } catch (UnsupportedJwtException e) {
