@@ -10,6 +10,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Getter
@@ -33,6 +35,12 @@ public class Customer {
 
     @Column(name = "customer_email", unique = true, nullable = false)
     private String email;
+
+    @ManyToMany
+    @JoinTable(name = "customer_authority", joinColumns = {@JoinColumn(name = "customer_id", referencedColumnName = "customer_id")},
+            inverseJoinColumns = {@JoinColumn(name = "authority_name", referencedColumnName = "authority_name")})
+    private Set<Authority> authorities = new HashSet<>(); // nullPointerException 방지위해 초기화 함
+
 
     @Column(name = "activated_account") // 이후 softdelete에도 쓸수 있을듯, 활성화된 계정
     private boolean enabled;

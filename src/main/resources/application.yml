@@ -25,7 +25,19 @@ spring:
           timeout: 5000
           starttls:
               enable: true
-  data:
-    redis:
-      host: localhost
-      port: 6379
+jwt:
+  header: Authorization
+  secret:
+    key: ${JWT_SECRET_KEY}
+  refresh:
+    secret:
+      key: ${JWT_REFRESH_SECRET_KEY}
+  expiration_time: 90
+  refresh_expiration_time: 604800
+logging:
+    level:
+      org.springframework.security: debug
+data:
+  redis:
+    host: localhost
+    port: 6379

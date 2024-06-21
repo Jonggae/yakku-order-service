@@ -33,7 +33,7 @@ public class CustomerController {
 
     }
 
-    //todo: 시큐리티 구현 후 작성
+
     @GetMapping("/my-page")
     public ResponseEntity<ApiResponseDto<CustomerResponseDto>> myPage() {
         CustomerResponseDto getCustomerDto = customerService.getMyPage();
