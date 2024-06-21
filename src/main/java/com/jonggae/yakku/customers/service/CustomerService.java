@@ -8,7 +8,9 @@ import com.jonggae.yakku.customers.entity.Customer;
 import com.jonggae.yakku.customers.repository.AuthorityRepository;
 import com.jonggae.yakku.customers.repository.CustomerRepository;
 import com.jonggae.yakku.exceptions.DuplicateMemberException;
+import com.jonggae.yakku.exceptions.NotFoundMemberException;
 import com.jonggae.yakku.mailVerification.service.MailService;
+import com.jonggae.yakku.sercurity.utils.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +29,7 @@ public class CustomerService {
     private final MailService mailService;
     private final TokenService tokenService;
     private final AuthorityRepository authorityRepository;
+    private final SecurityUtil securityUtil;
 
     public void register(CustomerRequestDto customerRequestDto) {
         checkCustomerInfo(customerRequestDto.getCustomerName(), customerRequestDto.getEmail());
@@ -36,7 +39,7 @@ public class CustomerService {
     }
 
     public CustomerResponseDto confirmCustomer(String token) {
-        CustomerRequestDto customerRequestDto = tokenService.getUserDetailsByToken(token);
+        CustomerRequestDto customerRequestDto = tokenService.getUserDetailsByEmailToken(token);
         logger.debug("Retrieved CustomerResponseDto from token: {}", customerRequestDto);
 
         if (customerRequestDto != null) {
@@ -60,7 +63,7 @@ public class CustomerService {
                     .build();
 
             customerRepository.save(customer);
-            tokenService.deleteToken(token);
+            tokenService.deleteEmailToken(token);
             return CustomerResponseDto.from(customer);
 
         } else {
@@ -69,9 +72,13 @@ public class CustomerService {
     }
 
 
-    //todo: 시큐리티 구현 후 다시 작성
+    //todo: 액세스 토큰이 만료되었을 때도 아래 오류가 뜸. 수정필요
     public CustomerResponseDto getMyPage() {
-        return null;
+        return CustomerResponseDto.from(
+                securityUtil.getCurrentCustomerName()
+                        .flatMap(customerRepository::findOneWithAuthoritiesByCustomerName)
+                        .orElseThrow(() ->new NotFoundMemberException("회원 정보를 찾을 수 없습니다."))
+        );
     }
 
     private void checkCustomerInfo(String customerName, String email) {
