@@ -7,10 +7,9 @@ import com.jonggae.yakku.customers.entity.Authority;
 import com.jonggae.yakku.customers.entity.Customer;
 import com.jonggae.yakku.customers.repository.AuthorityRepository;
 import com.jonggae.yakku.customers.repository.CustomerRepository;
-import com.jonggae.yakku.exceptions.DuplicateCustomerException;
+import com.jonggae.yakku.exceptions.DuplicateMemberException;
 import com.jonggae.yakku.mailVerification.service.MailService;
 import lombok.RequiredArgsConstructor;
-import org.hibernate.sql.ast.tree.expression.Collation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -77,10 +76,10 @@ public class CustomerService {
 
     private void checkCustomerInfo(String customerName, String email) {
         if (customerRepository.findByCustomerName(customerName).isPresent()) {
-            throw new DuplicateCustomerException("이미 가입된 이름입니다.");
+            throw new DuplicateMemberException("이미 가입된 이름입니다.");
         }
         if (customerRepository.findByEmail(email).isPresent()) {
-            throw new DuplicateCustomerException("이미 사용중인 이메일 주소 입니다.");
+            throw new DuplicateMemberException("이미 사용중인 이메일 주소 입니다.");
         }
     }
 }
