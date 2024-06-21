@@ -32,12 +32,12 @@ jwt:
   refresh:
     secret:
       key: ${JWT_REFRESH_SECRET_KEY}
-  expiration_time: 86400
+  expiration_time: 90
   refresh_expiration_time: 604800
 logging:
     level:
       org.springframework.security: debug
 data:
   redis:
-    host: redis_container
+    host: localhost
     port: 6379
