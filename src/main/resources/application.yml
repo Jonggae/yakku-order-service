@@ -37,8 +37,7 @@ jwt:
 logging:
     level:
       org.springframework.security: debug
-
-  data:
-    redis:
-      host: redis_container
-      port: 6379
+data:
+  redis:
+    host: redis_container
+    port: 6379

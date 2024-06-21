@@ -5,6 +5,7 @@ import com.jonggae.yakku.common.apiResponse.ApiResponseUtil;
 import com.jonggae.yakku.exceptions.DuplicateMemberException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -13,6 +14,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
+@ControllerAdvice
 public class RestResponseExceptionHandler extends ResponseEntityExceptionHandler {
     //회원 가입 시 중복 회원 정보가 있을 때
     @ResponseStatus(BAD_REQUEST)
@@ -26,7 +28,7 @@ public class RestResponseExceptionHandler extends ResponseEntityExceptionHandler
 
     // 권한이 없는 계정으로 접근하였을 때 mvc 레벨
     @ResponseStatus(BAD_REQUEST)
-    @ExceptionHandler(value = {DuplicateMemberException.class, AccessDeniedException.class})
+    @ExceptionHandler(value = {AccessDeniedException.class})
     @ResponseBody
     protected ResponseEntity<ApiResponseDto<Object>> forbidden(RuntimeException ex, WebRequest request) {
         String additionalMsg = "접근 권한이 없습니다. 계정을 확인해주세요.";
