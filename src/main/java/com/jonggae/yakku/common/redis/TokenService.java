@@ -1,4 +1,4 @@
-package com.jonggae.yakku.customers.service;
+package com.jonggae.yakku.common.redis;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;

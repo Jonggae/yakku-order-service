@@ -1,6 +1,6 @@
 package com.jonggae.yakku.sercurity.controller;
 
-import com.jonggae.yakku.customers.service.TokenService;
+import com.jonggae.yakku.common.redis.TokenService;
 import com.jonggae.yakku.sercurity.jwt.TokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

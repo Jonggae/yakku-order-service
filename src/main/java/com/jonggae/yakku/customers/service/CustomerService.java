@@ -1,6 +1,7 @@
 package com.jonggae.yakku.customers.service;
 
 import com.jonggae.yakku.address.Address;
+import com.jonggae.yakku.common.redis.TokenService;
 import com.jonggae.yakku.customers.dto.CustomerRequestDto;
 import com.jonggae.yakku.customers.dto.CustomerResponseDto;
 import com.jonggae.yakku.customers.entity.Authority;
