@@ -3,15 +3,20 @@ package com.jonggae.yakku.customers.service;
 import com.jonggae.yakku.address.Address;
 import com.jonggae.yakku.customers.dto.CustomerRequestDto;
 import com.jonggae.yakku.customers.dto.CustomerResponseDto;
+import com.jonggae.yakku.customers.entity.Authority;
 import com.jonggae.yakku.customers.entity.Customer;
+import com.jonggae.yakku.customers.repository.AuthorityRepository;
 import com.jonggae.yakku.customers.repository.CustomerRepository;
 import com.jonggae.yakku.exceptions.DuplicateCustomerException;
 import com.jonggae.yakku.mailVerification.service.MailService;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.sql.ast.tree.expression.Collation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import java.util.Collections;
 
 @Service
 @RequiredArgsConstructor
@@ -22,11 +27,12 @@ public class CustomerService {
     private final PasswordEncoder passwordEncoder;
     private final MailService mailService;
     private final TokenService tokenService;
+    private final AuthorityRepository authorityRepository;
 
     public void register(CustomerRequestDto customerRequestDto) {
         checkCustomerInfo(customerRequestDto.getCustomerName(), customerRequestDto.getEmail());
 
-        String token = tokenService.createToken(customerRequestDto.getEmail(), customerRequestDto);
+        String token = tokenService.createEmailToken(customerRequestDto.getEmail(), customerRequestDto);
         mailService.sendMail(customerRequestDto.getEmail(), token);
     }
 
@@ -35,6 +41,10 @@ public class CustomerService {
         logger.debug("Retrieved CustomerResponseDto from token: {}", customerRequestDto);
 
         if (customerRequestDto != null) {
+
+            Authority authority = Authority.builder()
+                    .authorityName("ROLE_USER").build();
+            authorityRepository.save(authority);
 
             Address address = Address.builder()
                     .address(customerRequestDto.getAddress())
@@ -46,6 +56,7 @@ public class CustomerService {
                     .password(passwordEncoder.encode(customerRequestDto.getPassword()))
                     .email(customerRequestDto.getEmail())
                     .address(address)
+                    .authorities(Collections.singleton(authority))
                     .enabled(true)
                     .build();
 
