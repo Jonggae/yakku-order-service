@@ -43,7 +43,7 @@ public class CustomerController {
         return ApiResponseUtil.success(message, getCustomerDto, 200);
     }
 
-    @PutMapping("/my-page/update")
+    @PatchMapping("/my-page/update")
     public ResponseEntity<ApiResponseDto<CustomerResponseDto>> updateCustomerInfo(@RequestBody CustomerUpdateDto updateDto, Authentication authentication) {
         String customerName = authentication.getName();
         CustomerResponseDto updatedCustomer = customerService.updateCustomerInfo(customerName, updateDto);

@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
 import java.util.HashSet;
@@ -59,9 +60,9 @@ public class Customer {
     @JoinColumn(name = "address_id", referencedColumnName = "id")
     private Address address;
 
-    public void updateCustomerInfo(CustomerUpdateDto updateDto) {
+    public void updateCustomerInfo(CustomerUpdateDto updateDto, PasswordEncoder passwordEncoder) {
         if (updateDto.getEmail() != null) this.email = updateDto.getEmail();
-        if (updateDto.getPassword() !=null) this.password = updateDto.getPassword();
+        if (updateDto.getPassword() !=null) this.password = passwordEncoder.encode(updateDto.getPassword());
         if (updateDto.getAddress() != null && this.address!=null){
             this.address.updatedAddress(updateDto.getAddress(), updateDto.getAddressDetail());
         }

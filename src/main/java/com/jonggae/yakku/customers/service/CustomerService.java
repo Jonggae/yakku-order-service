@@ -89,7 +89,7 @@ public class CustomerService {
     public CustomerResponseDto updateCustomerInfo(String customerName, CustomerUpdateDto updateDto) {
         Customer customer = customerRepository.findByCustomerName(customerName)
                 .orElseThrow(NotFoundMemberException::new);
-        customer.updateCustomerInfo(updateDto);
+        customer.updateCustomerInfo(updateDto, passwordEncoder);
         customerRepository.save(customer);
         return CustomerResponseDto.from(customer);
 

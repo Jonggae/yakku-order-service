@@ -32,7 +32,7 @@ jwt:
   refresh:
     secret:
       key: ${JWT_REFRESH_SECRET_KEY}
-  expiration_time: 3600
+  expiration_time: 60
   refresh_expiration_time: 604800
 logging:
     level:
