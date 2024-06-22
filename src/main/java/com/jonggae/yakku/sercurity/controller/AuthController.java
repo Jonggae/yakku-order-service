@@ -5,6 +5,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.AllArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -17,7 +19,12 @@ public class AuthController {
     private final RedisTemplate<String, String> redisTemplate;
 
     @PostMapping("/api/customer/logout")
-    public ResponseEntity<?> logout(HttpServletRequest request){
+    public ResponseEntity<?> logout(HttpServletRequest request, Authentication authentication) {
+        String customerName = null;
+        if (authentication != null && authentication.getPrincipal() instanceof UserDetails) {
+            customerName = ((UserDetails) authentication.getPrincipal()).getUsername();
+        }
+
         String refreshToken = getCookieValue(request);
         String accessToken = getHeaderToken(request);
         if (refreshToken != null && Boolean.TRUE.equals(redisTemplate.hasKey(refreshToken))) {
@@ -25,12 +32,12 @@ public class AuthController {
         }
 
         if (accessToken != null) {
-            // 예: 10분
             long accessTokenExpirationMillis = 600000;
             redisTemplate.opsForValue().set(accessToken, "blacklisted", accessTokenExpirationMillis, TimeUnit.MILLISECONDS);
         }
 
-        return ResponseEntity.ok("로그아웃 되었습니다.");}
+        return ResponseEntity.ok((customerName != null ? customerName : "사용자") + "로그아웃 되었습니다.");
+    }
 
     private String getCookieValue(HttpServletRequest request) {
         if (request.getCookies() != null) {
@@ -42,6 +49,7 @@ public class AuthController {
         }
         return null;
     }
+
     private String getHeaderToken(HttpServletRequest request) {
         String bearerToken = request.getHeader("Authorization");
         if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
