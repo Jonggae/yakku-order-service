@@ -23,4 +23,9 @@ public class Address {
 
     @Column(name = "address_detail", nullable = false)
     private String addressDetail;
+
+    public void updatedAddress(String address, String addressDetail) {
+        if (address != null) this.address = address;
+        if (addressDetail != null) this.addressDetail = addressDetail;
+    }
 }

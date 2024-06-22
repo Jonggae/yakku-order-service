@@ -1,6 +1,7 @@
 package com.jonggae.yakku.customers.entity;
 
 import com.jonggae.yakku.address.Address;
+import com.jonggae.yakku.customers.dto.CustomerUpdateDto;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -57,4 +58,12 @@ public class Customer {
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "address_id", referencedColumnName = "id")
     private Address address;
+
+    public void updateCustomerInfo(CustomerUpdateDto updateDto) {
+        if (updateDto.getEmail() != null) this.email = updateDto.getEmail();
+        if (updateDto.getPassword() !=null) this.password = updateDto.getPassword();
+        if (updateDto.getAddress() != null && this.address!=null){
+            this.address.updatedAddress(updateDto.getAddress(), updateDto.getAddressDetail());
+        }
+    }
 }

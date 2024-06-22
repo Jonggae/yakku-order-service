@@ -1,7 +1,7 @@
 package com.jonggae.yakku.sercurity.handler.login;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jonggae.yakku.customers.service.TokenService;
+import com.jonggae.yakku.common.redis.TokenService;
 import com.jonggae.yakku.sercurity.jwt.TokenProvider;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
