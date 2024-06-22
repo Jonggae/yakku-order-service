@@ -75,7 +75,6 @@ public class CustomerService {
         }
     }
 
-
     //todo: 액세스 토큰이 만료되었을 때도 아래 오류가 뜸. 다른 예외처리로 수정필요
     public CustomerResponseDto getMyPage() {
         return CustomerResponseDto.from(

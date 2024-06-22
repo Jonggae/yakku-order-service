@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
-
+// todo: response 응답 형태 정리하기
 @RestController
 @AllArgsConstructor
 public class AuthController {

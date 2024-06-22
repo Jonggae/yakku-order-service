@@ -47,7 +47,7 @@ public class Customer {
     @Column(name = "activated_account") // 이후 softdelete에도 쓸수 있을듯, 활성화된 계정
     private boolean enabled;
 
-    // todo: Customer 엔티티의 생성 일자는 필요한가?
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
