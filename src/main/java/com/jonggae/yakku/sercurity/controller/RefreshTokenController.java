@@ -21,6 +21,7 @@ public class RefreshTokenController {
     private final TokenProvider tokenProvider;
     private final TokenService tokenService;
 
+    // 재발급 받는 과정
     @PostMapping("/api/auth/refresh")
     public ResponseEntity<?> refreshAccessToken(@RequestBody Map<String, String> request) {
         String refreshToken = request.get("refreshToken");

@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -23,6 +24,7 @@ import java.util.stream.Collectors;
 @Component
 public class TokenProvider implements InitializingBean {
 
+    private final RedisTemplate<String, String> redisTemplate;
     private final Logger logger = LoggerFactory.getLogger(TokenProvider.class);
     private static final String AUTHORITIES_KEY = "auth";
     private final String secretKey;
@@ -33,13 +35,14 @@ public class TokenProvider implements InitializingBean {
     private Key refreshKey;
 
     public TokenProvider(
-            @Value("${jwt.secret.key}") String secretKey,
+            RedisTemplate<String, String> redisTemplate, @Value("${jwt.secret.key}") String secretKey,
             @Value("${jwt.refresh.secret.key}") String refreshSecretKey,
             @Value("${jwt.expiration_time}") long tokenExpirationTime,
             @Value("${jwt.refresh_expiration_time}") long refreshTokenExpirationTime) {
+        this.redisTemplate = redisTemplate;
         this.secretKey = secretKey;
         this.refreshSecretKey = refreshSecretKey;
-        this.tokenExpirationTime = tokenExpirationTime * 1000; //테스트 중이므로 아주 짧게 지정해놨음.
+        this.tokenExpirationTime = tokenExpirationTime * 1000; // 60 = 1분
         this.refreshTokenExpirationTime = refreshTokenExpirationTime * 1000; // 예: 604800초 = 7일
     }
 
@@ -121,6 +124,9 @@ public class TokenProvider implements InitializingBean {
     }
 
     public boolean validateToken(String token) {
+        if (Boolean.TRUE.equals(redisTemplate.hasKey(token))) {
+            return false;
+        }
         try {
             Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
             return true;
