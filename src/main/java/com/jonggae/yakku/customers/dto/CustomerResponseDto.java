@@ -34,6 +34,5 @@ public class CustomerResponseDto {
                         .authorityName(authority.getAuthorityName()).build())
                         .collect(Collectors.toSet()))
                 .build();
-
     }
 }

@@ -4,9 +4,12 @@ import com.jonggae.yakku.common.apiResponse.ApiResponseDto;
 import com.jonggae.yakku.common.apiResponse.ApiResponseUtil;
 import com.jonggae.yakku.customers.dto.CustomerRequestDto;
 import com.jonggae.yakku.customers.dto.CustomerResponseDto;
+import com.jonggae.yakku.customers.dto.CustomerUpdateDto;
 import com.jonggae.yakku.customers.service.CustomerService;
+import com.jonggae.yakku.sercurity.utils.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -15,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 public class CustomerController {
 
     private final CustomerService customerService;
+    private final SecurityUtil securityUtil;
 
     //todo: 회원가입 상황에 대응한 예외 처리 작성하기 , message 처리하기
 
@@ -32,12 +36,18 @@ public class CustomerController {
         return ApiResponseUtil.success(message,customerDto, 200);
 
     }
-
-
     @GetMapping("/my-page")
     public ResponseEntity<ApiResponseDto<CustomerResponseDto>> myPage() {
         CustomerResponseDto getCustomerDto = customerService.getMyPage();
         String message = "회원 정보";
         return ApiResponseUtil.success(message, getCustomerDto, 200);
+    }
+
+    @PutMapping("/my-page/update")
+    public ResponseEntity<ApiResponseDto<CustomerResponseDto>> updateCustomerInfo(@RequestBody CustomerUpdateDto updateDto, Authentication authentication) {
+        String customerName = authentication.getName();
+        CustomerResponseDto updatedCustomer = customerService.updateCustomerInfo(customerName, updateDto);
+        String message = "회원 정보가 수정되었습니다.";
+        return ApiResponseUtil.success(message, updatedCustomer, 200);
     }
 }

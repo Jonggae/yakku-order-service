@@ -4,6 +4,7 @@ import com.jonggae.yakku.address.Address;
 import com.jonggae.yakku.common.redis.TokenService;
 import com.jonggae.yakku.customers.dto.CustomerRequestDto;
 import com.jonggae.yakku.customers.dto.CustomerResponseDto;
+import com.jonggae.yakku.customers.dto.CustomerUpdateDto;
 import com.jonggae.yakku.customers.entity.Authority;
 import com.jonggae.yakku.customers.entity.Customer;
 import com.jonggae.yakku.customers.repository.AuthorityRepository;
@@ -12,12 +13,14 @@ import com.jonggae.yakku.exceptions.DuplicateMemberException;
 import com.jonggae.yakku.exceptions.NotFoundMemberException;
 import com.jonggae.yakku.mailVerification.service.MailService;
 import com.jonggae.yakku.sercurity.utils.SecurityUtil;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.beans.Transient;
 import java.util.Collections;
 
 @Service
@@ -73,13 +76,23 @@ public class CustomerService {
     }
 
 
-    //todo: 액세스 토큰이 만료되었을 때도 아래 오류가 뜸. 수정필요
+    //todo: 액세스 토큰이 만료되었을 때도 아래 오류가 뜸. 다른 예외처리로 수정필요
     public CustomerResponseDto getMyPage() {
         return CustomerResponseDto.from(
                 securityUtil.getCurrentCustomerName()
                         .flatMap(customerRepository::findOneWithAuthoritiesByCustomerName)
                         .orElseThrow(() ->new NotFoundMemberException("회원 정보를 찾을 수 없습니다."))
         );
+    }
+
+    @Transactional
+    public CustomerResponseDto updateCustomerInfo(String customerName, CustomerUpdateDto updateDto) {
+        Customer customer = customerRepository.findByCustomerName(customerName)
+                .orElseThrow(NotFoundMemberException::new);
+        customer.updateCustomerInfo(updateDto);
+        customerRepository.save(customer);
+        return CustomerResponseDto.from(customer);
+
     }
 
     private void checkCustomerInfo(String customerName, String email) {
