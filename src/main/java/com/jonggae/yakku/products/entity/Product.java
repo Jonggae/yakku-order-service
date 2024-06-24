@@ -2,10 +2,7 @@ package com.jonggae.yakku.products.entity;
 
 import com.jonggae.yakku.products.dto.ProductDto;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 /*
 * Product_name
@@ -18,9 +15,11 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Getter
+@Setter
 @Builder
 @Table(name = "products")
 public class Product {
+
     @Id
     @Column(name = "product_id")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -45,5 +44,17 @@ public class Product {
         this.productDescription = productDto.getProductDescription();
         this.price = productDto.getPrice();
         this.stock = productDto.getStock();
+    }
+
+    public void decreaseStock(int quantity) {
+        this.stock -= quantity;
+    }
+
+    public boolean checkStock(int quantity) {
+        return this.stock >= quantity;
+    }
+
+    public void increaseStock(int quantity) {
+        this.stock += quantity;
     }
 }
