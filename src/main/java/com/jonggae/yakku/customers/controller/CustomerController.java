@@ -18,7 +18,6 @@ import org.springframework.web.bind.annotation.*;
 public class CustomerController {
 
     private final CustomerService customerService;
-    private final SecurityUtil securityUtil;
 
     //todo: 회원가입 상황에 대응한 예외 처리 작성하기 , response 응답 형태 정리하기
 
