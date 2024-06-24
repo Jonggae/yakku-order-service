@@ -1,27 +1,26 @@
 package com.jonggae.yakku.sercurity.utils;
 
 import com.jonggae.yakku.customers.entity.Customer;
+import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
-import java.util.List;
 
 public class CustomUserDetails implements UserDetails {
 
+    @Getter
     private final Customer customer;
+    private final Collection<? extends GrantedAuthority> authorities;
 
-    public CustomUserDetails(Customer customer) {
+    public CustomUserDetails(Customer customer, Collection<? extends GrantedAuthority> authorities) {
         this.customer = customer;
-    }
-
-    public Customer getCustomer() {
-        return customer;
+        this.authorities = authorities;
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return null;
+        return authorities;
     }
 
     @Override
@@ -39,5 +38,13 @@ public class CustomUserDetails implements UserDetails {
         return false;
     }
 
+    @Override
+    public boolean isEnabled() {
+        return customer.isEnabled();  // customer의 상태를 반영
+    }
+
+    public Long getCustomerId() {
+        return customer.getId();
+    }
 }
 
