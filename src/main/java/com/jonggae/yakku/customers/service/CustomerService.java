@@ -7,6 +7,7 @@ import com.jonggae.yakku.customers.dto.CustomerResponseDto;
 import com.jonggae.yakku.customers.dto.CustomerUpdateDto;
 import com.jonggae.yakku.customers.entity.Authority;
 import com.jonggae.yakku.customers.entity.Customer;
+import com.jonggae.yakku.customers.entity.UserRoleEnum;
 import com.jonggae.yakku.customers.repository.AuthorityRepository;
 import com.jonggae.yakku.customers.repository.CustomerRepository;
 import com.jonggae.yakku.exceptions.DuplicateMemberException;
@@ -49,7 +50,7 @@ public class CustomerService {
         if (customerRequestDto != null) {
 
             Authority authority = Authority.builder()
-                    .authorityName("ROLE_USER").build();
+                    .authorityName(UserRoleEnum.ROLE_USER).build();
             authorityRepository.save(authority);
 
             Address address = Address.builder()

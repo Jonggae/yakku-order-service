@@ -1,5 +1,6 @@
 package com.jonggae.yakku.customers.dto;
 
+import com.jonggae.yakku.customers.entity.UserRoleEnum;
 import lombok.*;
 
 @Getter
@@ -8,6 +9,6 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AuthorityDto {
-    public String authorityName;
+    public UserRoleEnum authorityName;
     //ROLE_USER, ROLE_ADMIN 존재
 }
