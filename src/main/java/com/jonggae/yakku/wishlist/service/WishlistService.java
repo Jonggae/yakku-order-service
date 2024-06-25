@@ -1,5 +1,8 @@
 package com.jonggae.yakku.wishlist.service;
 
+import com.jonggae.yakku.customers.entity.Customer;
+import com.jonggae.yakku.customers.repository.CustomerRepository;
+import com.jonggae.yakku.exceptions.NotFoundMemberException;
 import com.jonggae.yakku.exceptions.NotFoundProductException;
 import com.jonggae.yakku.exceptions.NotFoundWishlistException;
 import com.jonggae.yakku.exceptions.NotFoundWishlistItemException;
@@ -15,6 +18,8 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+
 @Service
 @RequiredArgsConstructor
 public class WishlistService {
@@ -22,18 +27,26 @@ public class WishlistService {
     private final WishlistRepository wishlistRepository;
     private final WishlistItemRepository wishlistItemRepository;
     private final ProductRepository productRepository;
+    private final CustomerRepository customerRepository;
+
 
     //내 위시리스트 조회
-
     public WishlistDto getWishlistItems(Long customerId) {
-        Wishlist wishList = wishlistRepository.findByCustomerId(customerId)
-                .orElseThrow(NotFoundWishlistException::new);
-        return WishlistDto.from(wishList);
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new NotFoundMemberException("Customer not found"));
+
+        Wishlist wishlist = wishlistRepository.findByCustomerId(customerId)
+                .orElseGet(() -> wishlistRepository.save(Wishlist.builder()
+                        .customer(customer)
+                        .wishlistItemList(new ArrayList<>())
+                        .build()));
+
+        return WishlistDto.from(wishlist);
     }
 
-    // 항목 추가
+// 항목 추가
 
-    public WishlistItemDto addWishItem(Long customerId, WishlistItemDto wishlistItemDto){
+    public WishlistItemDto addWishItem(Long customerId, WishlistItemDto wishlistItemDto) {
         Wishlist wishlist = wishlistRepository.findByCustomerId(customerId)
                 .orElseGet(() -> wishlistRepository.save(new Wishlist(customerId)));
 
@@ -68,7 +81,7 @@ public class WishlistService {
 
     //전체 비우기
     @Transactional
-    public void clearWishlist(Long customerId){
+    public void clearWishlist(Long customerId) {
         Wishlist wishlist = wishlistRepository.findByCustomerId(customerId)
                 .orElseThrow(NotFoundWishlistException::new);
         wishlistItemRepository.deleteAllByWishlist(wishlist);
