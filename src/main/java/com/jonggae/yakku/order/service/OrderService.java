@@ -61,7 +61,10 @@ public class OrderService {
 
         Product product = productRepository.findById(orderItemDto.getProductId())
                 .orElseThrow(NotFoundProductException::new);
-        // todo 재고 확인 넣음. 현재는 안함
+        // todo 재고 확인
+        if (!product.checkStock(orderItemDto.getQuantity())) {
+            throw new InsufficientStockException(orderItemDto.getProductName());
+        }
 
         OrderItem orderItem = OrderItem.builder()
                 .order(order)
@@ -104,7 +107,7 @@ public class OrderService {
             order.updateOrderStatus(OrderStatus.CANCELLED);
             orderRepository.save(order);
         } else {
-            throw new IllegalStateException("결제 완료, 주문 완료된 주문만 취소 가능합니다.");
+            throw new IllegalStateException("결제 완료나 주문 완료된 주문만 취소 가능합니다.");
         }
         return getOrderList(customerId);
     }
@@ -156,20 +159,7 @@ public class OrderService {
         return getOrderList(customerId);
     }
 
-    // 주문 객체 자체를 삭제하는 메서드
-    @Transactional
-    public List<OrderDto> deleteOrder(Long orderId, Long customerId) {
-
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(NotFoundOrderException::new);
-        if (order.getOrderStatus() == OrderStatus.CANCELLED) {
-            orderItemRepository.deleteAllByOrder(order);
-            orderRepository.delete(order);
-        } else {
-            throw new IllegalArgumentException("주문 취소 상태의 주문만 삭제 가능합니다.");
-        }
-        return getOrderList(customerId);
-    }
+    // 주문 객체 자체를 삭제하는 메서드 -> 사용하지 않음
 
     // 관리자가 모든 주문을 확인하는 용도 -> 보류
     public List<OrderDto> findAllOrders() {

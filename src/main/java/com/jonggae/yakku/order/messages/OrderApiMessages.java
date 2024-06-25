@@ -7,4 +7,5 @@ public class OrderApiMessages {
     public static final String ORDER_STATUS_UPDATE_SUCCESS = "주문 상태가 업데이트 되었습니다.";
     public static final String ORDER_UPDATE_SUCCESS = "주문 수량이 변경되었습니다.";
     public static final String ORDER_DELETE_SUCCESS = "주문에서 상품이 삭제되었습니다.";
+    public static final String ORDER_CANCEL_SUCCESS = "주문이 취소되었습니다.";
 }
