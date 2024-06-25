@@ -3,10 +3,12 @@ package com.jonggae.yakku.products.controller;
 import com.jonggae.yakku.common.apiResponse.ApiResponseDto;
 import com.jonggae.yakku.common.apiResponse.ApiResponseUtil;
 import com.jonggae.yakku.common.messageUtil.MessageUtil;
+import com.jonggae.yakku.products.dto.CustomPageDto;
 import com.jonggae.yakku.products.dto.ProductDto;
 import com.jonggae.yakku.products.messages.ProductApiMessages;
 import com.jonggae.yakku.products.service.ProductService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,8 +31,10 @@ public class ProductController {
 
     //전체 상품 조회
     @GetMapping
-    public ResponseEntity<ApiResponseDto<List<ProductDto>>> getProductList() {
-        List<ProductDto> products = productService.showAllProducts();
+    public ResponseEntity<ApiResponseDto<CustomPageDto<ProductDto>>> getProductList(
+            @RequestParam(name = "page",defaultValue = "0") int page,
+            @RequestParam(name = "size",defaultValue = "10") int size){
+        CustomPageDto<ProductDto> products = productService.showAllProducts(page, size);
         String message = MessageUtil.getMessage(ProductApiMessages.PRODUCT_LIST_SUCCESS);
         return ApiResponseUtil.success(message, products, 200);
     }
@@ -53,8 +57,11 @@ public class ProductController {
 
     // 상품 삭제
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponseDto<List<ProductDto>>> deleteProduct(@PathVariable("id") Long id) {
-        List<ProductDto> afterDeletionProducts = productService.deleteProduct(id);
+    public ResponseEntity<ApiResponseDto<CustomPageDto<ProductDto>>> deleteProduct(
+            @PathVariable("id") Long id,
+            @RequestParam(name = "page",defaultValue = "0") int page,
+            @RequestParam(name = "size",defaultValue = "10") int size) {
+        CustomPageDto<ProductDto> afterDeletionProducts = productService.deleteProduct(id, page, size);
         String message = MessageUtil.getMessage(ProductApiMessages.PRODUCT_DELETE_SUCCESS);
         return ApiResponseUtil.success(message, afterDeletionProducts, 200);
     }

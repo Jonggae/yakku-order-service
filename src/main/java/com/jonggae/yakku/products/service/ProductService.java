@@ -1,10 +1,15 @@
 package com.jonggae.yakku.products.service;
 
 import com.jonggae.yakku.exceptions.NotFoundProductException;
+import com.jonggae.yakku.products.dto.CustomPageDto;
 import com.jonggae.yakku.products.dto.ProductDto;
 import com.jonggae.yakku.products.entity.Product;
 import com.jonggae.yakku.products.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -29,11 +34,12 @@ public class ProductService {
     }
 
     //전체 조회
-    public List<ProductDto> showAllProducts() {
-        List<Product> products = productRepository.findAll();
-        return products.stream()
-                .map(ProductDto::from)
-                .collect(Collectors.toList());
+    public CustomPageDto<ProductDto> showAllProducts(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Product> productPage = productRepository.findAll(pageable);
+        Page<ProductDto> productDtoPage = productPage.map(ProductDto::from);
+
+        return CustomPageDto.from(productDtoPage);
     }
 
     //상품 단일 조회 (상세 조회)
@@ -52,11 +58,10 @@ public class ProductService {
     }
 
     // 상품 삭제 -삭제 후 전체 목록 반환
-    public List<ProductDto> deleteProduct(Long productId){
+    public CustomPageDto<ProductDto> deleteProduct(Long productId, int page, int size){
         Product product = productRepository.findById(productId)
                 .orElseThrow(NotFoundProductException::new);
         productRepository.delete(product);
-
-        return showAllProducts();
+        return showAllProducts(page, size);
     }
 }
