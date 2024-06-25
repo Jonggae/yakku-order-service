@@ -69,7 +69,8 @@ public class SecurityConfig {
         http.authorizeHttpRequests((authorizeRequests) -> authorizeRequests
                 .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
                 .requestMatchers("/api/customer/**").permitAll()
-                .anyRequest().permitAll());
+                .requestMatchers("/api/products/**").permitAll()
+                .anyRequest().authenticated());
 
         http.exceptionHandling(exceptionHandling ->
                 exceptionHandling

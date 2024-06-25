@@ -1,9 +1,6 @@
 package com.jonggae.yakku.customers.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
@@ -16,5 +13,6 @@ import lombok.*;
 public class Authority {
     @Id
     @Column(name = "authority_name")
-    private String authorityName;
+    @Enumerated(EnumType.STRING)
+    private UserRoleEnum authorityName;
 }

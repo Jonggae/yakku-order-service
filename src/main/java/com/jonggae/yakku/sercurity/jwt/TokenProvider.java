@@ -1,5 +1,6 @@
 package com.jonggae.yakku.sercurity.jwt;
 
+import com.jonggae.yakku.sercurity.utils.CustomUserDetailsService;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -13,6 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.security.Key;
@@ -31,6 +33,7 @@ public class TokenProvider implements InitializingBean {
     private final String refreshSecretKey;
     private final long tokenExpirationTime;
     private final long refreshTokenExpirationTime;
+    private final CustomUserDetailsService customUserDetailsService;
     private Key key;
     private Key refreshKey;
 
@@ -38,12 +41,13 @@ public class TokenProvider implements InitializingBean {
             RedisTemplate<String, String> redisTemplate, @Value("${jwt.secret.key}") String secretKey,
             @Value("${jwt.refresh.secret.key}") String refreshSecretKey,
             @Value("${jwt.expiration_time}") long tokenExpirationTime,
-            @Value("${jwt.refresh_expiration_time}") long refreshTokenExpirationTime) {
+            @Value("${jwt.refresh_expiration_time}") long refreshTokenExpirationTime, CustomUserDetailsService customUserDetailsService) {
         this.redisTemplate = redisTemplate;
         this.secretKey = secretKey;
         this.refreshSecretKey = refreshSecretKey;
         this.tokenExpirationTime = tokenExpirationTime * 1000; // 60 = 1분
         this.refreshTokenExpirationTime = refreshTokenExpirationTime * 1000; // 예: 604800초 = 7일
+        this.customUserDetailsService = customUserDetailsService;
     }
 
     @Override
@@ -96,9 +100,9 @@ public class TokenProvider implements InitializingBean {
                         .map(SimpleGrantedAuthority::new)
                         .collect(Collectors.toList());
 
-        User principal = new User(claims.getSubject(), "", authorities);
+        UserDetails userDetails = customUserDetailsService.loadUserByUsername(claims.getSubject());
 
-        return new UsernamePasswordAuthenticationToken(principal, token, authorities);
+        return new UsernamePasswordAuthenticationToken(userDetails, token, authorities);
     }
 
     public Authentication getAuthenticationFromRefreshToken(String refreshToken) {
@@ -109,9 +113,9 @@ public class TokenProvider implements InitializingBean {
                 .parseClaimsJws(refreshToken)
                 .getBody();
 
-        User principal = new User(claims.getSubject(), "", Arrays.asList(new SimpleGrantedAuthority("ROLE_USER")));
+        UserDetails userDetails = customUserDetailsService.loadUserByUsername(claims.getSubject());
 
-        return new UsernamePasswordAuthenticationToken(principal, refreshToken, principal.getAuthorities());
+        return new UsernamePasswordAuthenticationToken(userDetails, refreshToken, userDetails.getAuthorities());
     }
 
     public String getCustomerNameFromToken(String token) {
