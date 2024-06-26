@@ -3,30 +3,19 @@ version: '3.8'
 services:
   mysql:
     image: mysql:latest
-    container_name: my_mysql_container
+    container_name: order_service_container
     env_file:
       - .env
     ports:
-      - "3306:3306"
+      - "3309:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-    networks:
-      - my_network
-
-  redis:
-    image: "redis:latest"
-    container_name: "redis_container"
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
     networks:
       - my_network
 
 
 volumes:
   mysql_data:
-  redis_data:
 
 networks:
   my_network:

@@ -1,6 +1,8 @@
+server:
+  port: 8083
 spring:
   datasource:
-    url: jdbc:mysql://my_mysql_container:3306/yakku_database
+    url: jdbc:mysql://order_service_container:3306/order_database
     username: ${DATABASE_USERNAME}
     password: ${DATABASE_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -37,7 +39,4 @@ jwt:
 logging:
     level:
       org.springframework.security: debug
-data:
-  redis:
-    host: localhost
-    port: 6379
+
