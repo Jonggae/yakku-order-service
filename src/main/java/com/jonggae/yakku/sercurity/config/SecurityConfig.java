@@ -70,7 +70,7 @@ public class SecurityConfig {
                 .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
                 .requestMatchers("/api/customer/**").permitAll()
                 .requestMatchers("/api/products/**").permitAll()
-                .anyRequest().authenticated());
+                .anyRequest().permitAll());
 
         http.exceptionHandling(exceptionHandling ->
                 exceptionHandling

@@ -1,6 +1,8 @@
 server:
   port: 8083
 spring:
+  application:
+    name: order-service
   datasource:
     url: jdbc:mysql://order_service_container:3306/order_database
     username: ${DATABASE_USERNAME}
@@ -40,3 +42,17 @@ logging:
     level:
       org.springframework.security: debug
 
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: '*'

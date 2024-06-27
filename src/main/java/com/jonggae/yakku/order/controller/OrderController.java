@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
 
@@ -20,6 +21,25 @@ import java.util.List;
 @RequiredArgsConstructor
 @RequestMapping("/api/orders")
 public class OrderController {
+
+    private final RestTemplate restTemplate;
+
+    @GetMapping("/test")
+    public String test() {
+        return "Order Service is up and running!";
+    }
+
+    @GetMapping("/test-user")
+    public String testUserService() {
+        String userServiceUrl = "http://localhost:8081/api/customer/test";
+        return restTemplate.getForObject(userServiceUrl, String.class);
+    }
+
+    @GetMapping("/test-product")
+    public String testProductService() {
+        String productServiceUrl = "http://localhost:8082/api/products/test";
+        return restTemplate.getForObject(productServiceUrl, String.class);
+    }
 
     private final OrderService orderService;
     private final SecurityUtil securityUtil;
