@@ -4,6 +4,7 @@ import com.jonggae.yakku.common.apiResponse.ApiResponseDto;
 import com.jonggae.yakku.common.apiResponse.ApiResponseUtil;
 import com.jonggae.yakku.common.messageUtil.MessageUtil;
 import com.jonggae.yakku.order.dto.OrderDto;
+import com.jonggae.yakku.order.messages.OrderApiMessages;
 import com.jonggae.yakku.order.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -25,7 +26,7 @@ public class OrderApiController {
     public ResponseEntity<ApiResponseDto<List<OrderDto>>> getOrderList(@RequestHeader("customerId") Long customerId,
                                                                        @RequestHeader("customerName") String customerName) {
         List<OrderDto> orderDto = orderService.getOrderList(customerId);
-        String message = MessageUtil.getFormattedMessage("Order list retrieved successfully", customerName);
+        String message = MessageUtil.getFormattedMessage(OrderApiMessages.ORDER_LIST_SUCCESS, customerName);
         return ApiResponseUtil.success(message, orderDto, 200);
 
     }
