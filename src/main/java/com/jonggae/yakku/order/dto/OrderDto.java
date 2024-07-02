@@ -19,7 +19,7 @@ public class OrderDto {
 
     private Long orderId;
     private Long customerId;
-    private String customerName;
+
     private LocalDateTime orderDateTime;
     private List<OrderItemDto> orderItemList;
     private OrderStatus status;
@@ -31,8 +31,7 @@ public class OrderDto {
 
         return OrderDto.builder()
                 .orderId(order.getId())
-                .customerId(order.getCustomer().getId())
-                .customerName(order.getCustomer().getCustomerName())
+                .customerId(order.getCustomerId())
                 .orderItemList(orderItemsDto)
                 .status(order.getOrderStatus())
                 .orderDateTime(order.getOrderDate())

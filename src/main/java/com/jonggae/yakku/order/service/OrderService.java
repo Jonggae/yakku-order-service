@@ -1,8 +1,8 @@
 package com.jonggae.yakku.order.service;
 
-import com.jonggae.yakku.customers.entity.Customer;
-import com.jonggae.yakku.customers.repository.CustomerRepository;
-import com.jonggae.yakku.exceptions.*;
+import com.jonggae.yakku.exceptions.InsufficientStockException;
+import com.jonggae.yakku.exceptions.NotFoundOrderException;
+import com.jonggae.yakku.exceptions.NotFoundOrderItemException;
 import com.jonggae.yakku.order.dto.OrderDto;
 import com.jonggae.yakku.order.dto.OrderItemDto;
 import com.jonggae.yakku.order.dto.OrderStatusUpdateDto;
@@ -17,7 +17,6 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -28,23 +27,23 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final ProductRepository productRepository;
-    private final CustomerRepository customerRepository;
+//    private final CustomerRepository customerRepository;
 
     /*주문은 많은 상태가 필요함.
      * 위시리스트와 연관지어서 바로 주문에 추가하거나, 위시리스트를 거쳐 주문에 추가할 수 있는 방법을 만들어보자
      * i) 어떤 방법을 통하든 결과적으로 확정되지 않은 주문이 하나 생성됨 (PendingOrder) */
 
-    public Order createPendingOrder(Long customerId) {
-        Customer customer = customerRepository.findById(customerId)
-                .orElseThrow(NotFoundMemberException::new);
-
-        Order order = Order.builder()
-                .customer(customer)
-                .orderDate(LocalDateTime.now())
-                .orderStatus(OrderStatus.PENDING_ORDER)
-                .build();
-        return orderRepository.save(order);
-    }
+//    public Order createPendingOrder(Long customerId) {
+//        Customer customer = customerRepository.findById(customerId)
+//                .orElseThrow(NotFoundMemberException::new);
+//
+//        Order order = Order.builder()
+//                .customerId(customer.getId()) //todo: id로 접근해야함
+//                .orderDate(LocalDateTime.now())
+//                .orderStatus(OrderStatus.PENDING_ORDER)
+//                .build();
+//        return orderRepository.save(order);
+//    }
 
     public List<OrderDto> getOrderList(Long customerId) {
         return orderRepository.findAllByCustomerId(customerId).stream()
@@ -52,32 +51,32 @@ public class OrderService {
                 .toList();
     }
 
-    public OrderItemDto addOrderItem(Long customerId, OrderItemDto orderItemDto) {
-        customerRepository.findById(customerId)
-                .orElseThrow(NotFoundMemberException::new);
-
-        Order order = orderRepository.findByCustomerIdAndOrderStatus(customerId, OrderStatus.PENDING_ORDER)
-                .orElseGet(() -> createPendingOrder(customerId));
-
-        Product product = productRepository.findById(orderItemDto.getProductId())
-                .orElseThrow(NotFoundProductException::new);
-        // todo 재고 확인
-        if (!product.checkStock(orderItemDto.getQuantity())) {
-            throw new InsufficientStockException(orderItemDto.getProductName());
-        }
-
-        OrderItem orderItem = OrderItem.builder()
-                .order(order)
-                .product(product)
-                .quantity(orderItemDto.getQuantity())
-                .build();
-
-        orderItem = orderItemRepository.save(orderItem);
-        order.getOrderItemList().add(orderItem);
-        orderRepository.save(order);
-
-        return OrderItemDto.from(orderItem);
-    }
+//    public OrderItemDto addOrderItem(Long customerId, OrderItemDto orderItemDto) {
+//        customerRepository.findById(customerId)
+//                .orElseThrow(NotFoundMemberException::new);
+//
+//        Order order = orderRepository.findByCustomerIdAndOrderStatus(customerId, OrderStatus.PENDING_ORDER)
+//                .orElseGet(() -> createPendingOrder(customerId));
+//
+//        Product product = productRepository.findById(orderItemDto.getProductId())
+//                .orElseThrow(NotFoundProductException::new);
+//        // todo 재고 확인
+//        if (!product.checkStock(orderItemDto.getQuantity())) {
+//            throw new InsufficientStockException(orderItemDto.getProductName());
+//        }
+//
+//        OrderItem orderItem = OrderItem.builder()
+//                .order(order)
+//                .product(product)
+//                .quantity(orderItemDto.getQuantity())
+//                .build();
+//
+//        orderItem = orderItemRepository.save(orderItem);
+//        order.getOrderItemList().add(orderItem);
+//        orderRepository.save(order);
+//
+//        return OrderItemDto.from(orderItem);
+//    }
 
     // 주문 확정 (재고 감소해야함)
     @Transactional
@@ -125,7 +124,7 @@ public class OrderService {
     }
 
     // 주문 상태 업데이트
-    public OrderDto updateOrderStatus(Long orderId, OrderStatusUpdateDto statusUpdateDto){
+    public OrderDto updateOrderStatus(Long orderId, OrderStatusUpdateDto statusUpdateDto) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(NotFoundOrderException::new);
         OrderStatus newStatus = statusUpdateDto.getStatus();
@@ -134,7 +133,7 @@ public class OrderService {
     }
 
     // 미확정된 주문 수정하기 - 주문 수량 변경
-    public List<OrderDto> updateOrderItemQuantity(Long customerId, Long orderItemId, OrderItemDto orderItemDto){
+    public List<OrderDto> updateOrderItemQuantity(Long customerId, Long orderItemId, OrderItemDto orderItemDto) {
         OrderItem orderItem = orderItemRepository.findById(orderItemId)
                 .orElseThrow(NotFoundOrderItemException::new);
 
@@ -165,6 +164,12 @@ public class OrderService {
     public List<OrderDto> findAllOrders() {
         List<Order> orders = orderRepository.findAll();
         return orders.stream().map(OrderDto::from)
+                .collect(Collectors.toList());
+    }
+
+    public List<OrderDto> getOrderListByCustomerId(Long customerId) {
+        return orderRepository.findByCustomerId(customerId).stream()
+                .map(OrderDto::from)
                 .collect(Collectors.toList());
     }
 }
