@@ -24,18 +24,18 @@ public class OrderDto {
     private List<OrderItemDto> orderItemList;
     private OrderStatus status;
 
-    public static OrderDto from(Order order) {
-        List<OrderItemDto> orderItemsDto = order.getOrderItemList().stream()
-                .map(OrderItemDto::from)
-                .toList();
-
-        return OrderDto.builder()
-                .orderId(order.getId())
-                .customerId(order.getCustomerId())
-                .orderItemList(orderItemsDto)
-                .status(order.getOrderStatus())
-                .orderDateTime(order.getOrderDate())
-                .build();
-
-    }
+//    public static OrderDto from(Order order) {
+//        List<OrderItemDto> orderItemsDto = order.getOrderItemList().stream()
+//                .map(OrderItemDto::from)
+//                .toList();
+//
+//        return OrderDto.builder()
+//                .orderId(order.getId())
+//                .customerId(order.getCustomerId())
+//                .orderItemList(orderItemsDto)
+//                .status(order.getOrderStatus())
+//                .orderDateTime(order.getOrderDate())
+//                .build();
+//
+//    }
 }

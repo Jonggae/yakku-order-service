@@ -21,14 +21,14 @@ public class OrderItem {
     @JoinColumn(name = "order_id")
     private Order order;
 
-    @ManyToOne
-    private Product product;
-
-    @Column(nullable = false)
-    private int quantity;
-
-    public Long getTotalPrice() {
-        return product.getPrice() * quantity;
-    }
+//    @ManyToOne
+//    private Product product;
+//
+//    @Column(nullable = false)
+//    private int quantity;
+//
+//    public Long getTotalPrice() {
+//        return product.getPrice() * quantity;
+//    }
 
 }

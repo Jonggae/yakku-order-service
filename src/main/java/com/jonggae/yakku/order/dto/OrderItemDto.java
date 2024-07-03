@@ -18,13 +18,13 @@ public class OrderItemDto {
     private Integer quantity;
     private Long price;
 
-    public static OrderItemDto from(OrderItem orderItem) {
-        return OrderItemDto.builder()
-                .itemId(orderItem.getId())
-                .productId(orderItem.getProduct().getId())
-                .productName(orderItem.getProduct().getProductName())
-                .quantity(orderItem.getQuantity())
-                .price(orderItem.getTotalPrice())
-                .build();
-    }
+//    public static OrderItemDto from(OrderItem orderItem) {
+//        return OrderItemDto.builder()
+//                .itemId(orderItem.getId())
+//                .productId(orderItem.getProduct().getId())
+//                .productName(orderItem.getProduct().getProductName())
+//                .quantity(orderItem.getQuantity())
+//                .price(orderItem.getTotalPrice())
+//                .build();
+//    }
 }

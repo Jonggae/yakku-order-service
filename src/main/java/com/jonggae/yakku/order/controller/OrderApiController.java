@@ -28,6 +28,5 @@ public class OrderApiController {
         List<OrderDto> orderDto = orderService.getOrderList(customerId);
         String message = MessageUtil.getFormattedMessage(OrderApiMessages.ORDER_LIST_SUCCESS, customerName);
         return ApiResponseUtil.success(message, orderDto, 200);
-
     }
 }
