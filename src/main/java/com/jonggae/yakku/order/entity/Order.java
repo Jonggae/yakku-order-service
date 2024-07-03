@@ -1,6 +1,5 @@
 package com.jonggae.yakku.order.entity;
 
-import com.jonggae.yakku.customers.entity.Customer;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -32,11 +31,10 @@ public class Order {
     @Enumerated(EnumType.STRING)
     private OrderStatus orderStatus;
 
-    @ManyToOne
-    private Customer customer;
+    private Long customerId;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
-    private List<OrderItem>orderItemList = new ArrayList<>();
+    private List<OrderItem> orderItemList = new ArrayList<>();
 
     //주문 확정용
     public void confirmOrder() {
