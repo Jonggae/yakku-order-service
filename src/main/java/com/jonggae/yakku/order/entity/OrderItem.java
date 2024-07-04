@@ -1,6 +1,5 @@
 package com.jonggae.yakku.order.entity;
 
-import com.jonggae.yakku.products.entity.Product;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -16,6 +15,11 @@ public class OrderItem {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
+
+    private Long productId;
+    private String productName;
+    private int quantity;
+    private Long price;
 
     @ManyToOne
     @JoinColumn(name = "order_id")

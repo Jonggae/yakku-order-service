@@ -1,26 +1,123 @@
 package com.jonggae.yakku.order.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jonggae.yakku.exceptions.NotFoundOrderException;
+import com.jonggae.yakku.exceptions.NotFoundOrderItemException;
+import com.jonggae.yakku.exceptions.OrderProcessingException;
 import com.jonggae.yakku.order.dto.OrderDto;
-import com.jonggae.yakku.order.repository.OrderItemRepository;
+import com.jonggae.yakku.order.dto.ProductDto;
+import com.jonggae.yakku.order.dto.ProductInfoRequest;
+import com.jonggae.yakku.order.entity.Order;
+import com.jonggae.yakku.order.entity.OrderItem;
+import com.jonggae.yakku.order.entity.OrderStatus;
 import com.jonggae.yakku.order.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class OrderService {
 
     private final OrderRepository orderRepository;
-    private final OrderItemRepository orderItemRepository;
-//    private final ProductRepository productRepository;
-//    private final CustomerRepository customerRepository;
+    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final Map<Long, CompletableFuture<ProductDto>> futureMap = new ConcurrentHashMap<>();
 
-    /*주문은 많은 상태가 필요함.
-     * 위시리스트와 연관지어서 바로 주문에 추가하거나, 위시리스트를 거쳐 주문에 추가할 수 있는 방법을 만들어보자
-     * i) 어떤 방법을 통하든 결과적으로 확정되지 않은 주문이 하나 생성됨 (PendingOrder) */
 
+    public OrderDto addProductToOrder(Long customerId, Long productId, int quantity) {
+        try {
+            Order order = orderRepository.findPendingOrderByCustomerId(customerId)
+                    .orElseGet(() -> createNewOrder(customerId));
+
+            OrderItem orderItem = OrderItem.builder()
+                    .productId(productId)
+                    .quantity(quantity)
+                    .order(order)
+                    .build();
+            order.getOrderItemList().add(orderItem);
+
+            Order savedOrder = orderRepository.save(order);
+
+            CompletableFuture<ProductDto> future = new CompletableFuture<>();
+            requestProductInfo(productId, customerId, savedOrder.getId(), future);
+
+            // 최대 5초 대기
+            ProductDto productDto = future.get(30, TimeUnit.SECONDS);
+
+            updateOrderItem(savedOrder.getId(), productDto);
+
+            return OrderDto.from(orderRepository.findById(savedOrder.getId()).orElseThrow());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new OrderProcessingException("주문 처리 중 인터럽트 발생", e);
+        } catch (ExecutionException e) {
+            throw new OrderProcessingException("주문 처리 중 실행 오류가 발생했습니다.", e);
+        } catch (TimeoutException e) {
+            throw new OrderProcessingException("주문 처리 시간이 초과되었습니다.", e);
+        }
+    }
+
+    private Order createNewOrder(Long customerId) {
+        Order newOrder = new Order();
+        newOrder.setCustomerId(customerId);
+        newOrder.setOrderDate(LocalDateTime.now());
+        newOrder.setOrderStatus(OrderStatus.PENDING_ORDER);
+        return newOrder;
+    }
+
+    private void requestProductInfo(Long productId, Long customerId, Long orderId, CompletableFuture<ProductDto> future) {
+        ProductInfoRequest request = new ProductInfoRequest(productId, customerId, orderId);
+        try {
+            String value = objectMapper.writeValueAsString(request);
+            kafkaTemplate.send("product-info-request", productId.toString(), value);
+        } catch (JsonProcessingException e) {
+
+        }
+    }
+
+    @KafkaListener(topics = "product-info-response", groupId = "order-service")
+    public void handleProductInfoResponse(String message) {
+        try {
+            ProductDto productDto = objectMapper.readValue(message, ProductDto.class);
+            CompletableFuture<ProductDto> future = futureMap.get(productDto.getOrderId());
+            if (future != null) {
+                future.complete(productDto);
+            }
+            updateOrderItem(productDto.getOrderId(), productDto);
+        } catch (JsonProcessingException e) {
+
+        }
+    }
+
+    private void updateOrderItem(Long orderId, ProductDto productDto) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(NotFoundOrderException::new);
+
+        OrderItem orderItem = order.getOrderItemList().stream()
+                .filter(item -> item.getProductId().equals(productDto.getProductId()))
+                .findFirst()
+                .orElseThrow(NotFoundOrderItemException::new);
+
+        orderItem.setProductName(productDto.getProductName());
+        orderItem.setPrice(productDto.getPrice() * orderItem.getQuantity());
+
+        orderRepository.save(order);
+    }
+
+    public List<OrderDto> getOrderList(Long customerId) {
+        return orderRepository.findAllByCustomerId(customerId).stream()
+                .map(OrderDto::from)
+                .collect(Collectors.toList());
+    }
 //    public Order createPendingOrder(Long customerId) {
 //        Customer customer = customerRepository.findById(customerId)
 //                .orElseThrow(NotFoundMemberException::new);
@@ -32,13 +129,6 @@ public class OrderService {
 //                .build();
 //        return orderRepository.save(order);
 //    }
-
-    public List<OrderDto> getOrderList(Long customerId) {
-        return orderRepository.findAllByCustomerId(customerId).stream()
-                .map(OrderDto::from)
-                .toList();
-    }
-
 //    public OrderItemDto addOrderItem(Long customerId, OrderItemDto orderItemDto) {
 //        customerRepository.findById(customerId)
 //                .orElseThrow(NotFoundMemberException::new);
