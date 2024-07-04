@@ -12,7 +12,9 @@ import com.jonggae.yakku.order.entity.Order;
 import com.jonggae.yakku.order.entity.OrderItem;
 import com.jonggae.yakku.order.entity.OrderStatus;
 import com.jonggae.yakku.order.repository.OrderRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,7 @@ import java.util.Map;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderService {
@@ -47,11 +50,14 @@ public class OrderService {
 
             Order savedOrder = orderRepository.save(order);
 
+            if (savedOrder.getId() == null) {
+                throw new IllegalStateException("Saved order has null id");
+            }
             CompletableFuture<ProductDto> future = new CompletableFuture<>();
             requestProductInfo(productId, customerId, savedOrder.getId(), future);
 
             // 최대 5초 대기
-            ProductDto productDto = future.get(30, TimeUnit.SECONDS);
+            ProductDto productDto = future.get(10, TimeUnit.SECONDS);
 
             updateOrderItem(savedOrder.getId(), productDto);
 
@@ -75,46 +81,75 @@ public class OrderService {
     }
 
     private void requestProductInfo(Long productId, Long customerId, Long orderId, CompletableFuture<ProductDto> future) {
+        if (orderId == null) {
+            log.error("Cannot request product info with null orderId");
+            future.completeExceptionally(new IllegalArgumentException("orderId cannot be null"));
+            return;
+        }
+
         ProductInfoRequest request = new ProductInfoRequest(productId, customerId, orderId);
         try {
             String value = objectMapper.writeValueAsString(request);
+            futureMap.put(orderId, future);
+            log.info("Sending product info request for orderId: {}", orderId);
             kafkaTemplate.send("product-info-request", productId.toString(), value);
         } catch (JsonProcessingException e) {
-
+            log.error("Error processing product info request", e);
+            future.completeExceptionally(e);
         }
     }
 
+    @Transactional
     @KafkaListener(topics = "product-info-response", groupId = "order-service")
     public void handleProductInfoResponse(String message) {
         try {
+            log.info("Received product info response: {}", message);
+
             ProductDto productDto = objectMapper.readValue(message, ProductDto.class);
+            if (productDto.getOrderId() == null) {
+                log.error("Received ProductDto with null orderId: {}", productDto);
+                return;
+            }
             CompletableFuture<ProductDto> future = futureMap.get(productDto.getOrderId());
             if (future != null) {
                 future.complete(productDto);
+                log.info("Completed future for orderId: {}", productDto.getOrderId());  // 로그 추가
+            } else {
+                log.warn("No future found for orderId: {}", productDto.getOrderId());  // 로그 추가
             }
             updateOrderItem(productDto.getOrderId(), productDto);
-        } catch (JsonProcessingException e) {
+        } catch (Exception e) {
+            log.error("Error processing product info response", e);  // 로그 추가
 
         }
     }
 
-    private void updateOrderItem(Long orderId, ProductDto productDto) {
+    @Transactional
+    protected void updateOrderItem(Long orderId, ProductDto productDto) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(NotFoundOrderException::new);
+        log.debug("Order found: {}, OrderItems: {}", orderId, order.getOrderItemList());
 
         OrderItem orderItem = order.getOrderItemList().stream()
-                .filter(item -> item.getProductId().equals(productDto.getProductId()))
+                .peek(item -> log.debug("Checking OrderItem: productId={}, orderId={}", item.getProductId(), item.getOrder().getId()))
+                .filter(item -> item.getProductId().equals(productDto.getId()))
                 .findFirst()
-                .orElseThrow(NotFoundOrderItemException::new);
+                .orElseThrow(() -> {
+                    log.error("OrderItem not found for orderId: {} and productId: {}", orderId, productDto.getId());
+                    return new NotFoundOrderItemException();
+                });
 
         orderItem.setProductName(productDto.getProductName());
         orderItem.setPrice(productDto.getPrice() * orderItem.getQuantity());
 
+        log.info("Updating OrderItem: {}", orderItem);
+
         orderRepository.save(order);
     }
 
+
     public List<OrderDto> getOrderList(Long customerId) {
-        return orderRepository.findAllByCustomerId(customerId).stream()
+        return orderRepository.findAllByCustomerIdWithItems(customerId).stream()
                 .map(OrderDto::from)
                 .collect(Collectors.toList());
     }
