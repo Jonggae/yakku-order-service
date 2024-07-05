@@ -1,12 +1,9 @@
-package com.jonggae.yakku.order.dto;
+package com.jonggae.yakku.kafka.kafkaDto;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-//@JsonIgnoreProperties(ignoreUnknown = true)
 
 @Builder
 @NoArgsConstructor

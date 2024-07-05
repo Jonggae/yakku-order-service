@@ -2,12 +2,14 @@ package com.jonggae.yakku.order.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jonggae.yakku.exceptions.InvalidProductDataException;
 import com.jonggae.yakku.exceptions.NotFoundOrderException;
 import com.jonggae.yakku.exceptions.NotFoundOrderItemException;
 import com.jonggae.yakku.exceptions.OrderProcessingException;
+import com.jonggae.yakku.kafka.EventDto;
 import com.jonggae.yakku.order.dto.OrderDto;
-import com.jonggae.yakku.order.dto.ProductDto;
-import com.jonggae.yakku.order.dto.ProductInfoRequest;
+import com.jonggae.yakku.kafka.kafkaDto.ProductDto;
+import com.jonggae.yakku.kafka.kafkaDto.ProductInfoRequest;
 import com.jonggae.yakku.order.entity.Order;
 import com.jonggae.yakku.order.entity.OrderItem;
 import com.jonggae.yakku.order.entity.OrderStatus;
@@ -35,7 +37,12 @@ public class OrderService {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Map<Long, CompletableFuture<ProductDto>> futureMap = new ConcurrentHashMap<>();
 
-
+    public List<OrderDto> getOrderList(Long customerId) {
+        return orderRepository.findAllByCustomerIdWithItems(customerId).stream()
+                .map(OrderDto::from)
+                .collect(Collectors.toList());
+    }
+    // 주문에 상품 추가하기
     public OrderDto addProductToOrder(Long customerId, Long productId, int quantity) {
         try {
             Order order = orderRepository.findPendingOrderByCustomerId(customerId)
@@ -56,19 +63,25 @@ public class OrderService {
             CompletableFuture<ProductDto> future = new CompletableFuture<>();
             requestProductInfo(productId, customerId, savedOrder.getId(), future);
 
-            // 최대 5초 대기
-            ProductDto productDto = future.get(10, TimeUnit.SECONDS);
+            try {
+                // 최대 10초 대기
+                ProductDto productDto = future.get(10, TimeUnit.SECONDS);
+                updateOrderItem(savedOrder.getId(), productDto);
+                return OrderDto.from(orderRepository.findById(savedOrder.getId()).orElseThrow());
+            } catch (ExecutionException e) {
 
-            updateOrderItem(savedOrder.getId(), productDto);
-
-            return OrderDto.from(orderRepository.findById(savedOrder.getId()).orElseThrow());
+                if (e.getCause() instanceof InvalidProductDataException) {
+                    orderRepository.delete(savedOrder);  // 주문 삭제
+                    throw new OrderProcessingException("상품 정보를 가져오는데 실패했습니다. 다시 시도해주세요.", e);
+                }
+                throw new OrderProcessingException("주문 처리 중 실행 오류가 발생했습니다.", e);
+            } catch (TimeoutException e) {
+                orderRepository.delete(savedOrder);  // 주문 삭제
+                throw new OrderProcessingException("주문 처리 시간이 초과되었습니다. 다시 시도해주세요.", e);
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new OrderProcessingException("주문 처리 중 인터럽트 발생", e);
-        } catch (ExecutionException e) {
-            throw new OrderProcessingException("주문 처리 중 실행 오류가 발생했습니다.", e);
-        } catch (TimeoutException e) {
-            throw new OrderProcessingException("주문 처리 시간이 초과되었습니다.", e);
         }
     }
 
@@ -87,9 +100,16 @@ public class OrderService {
             return;
         }
 
-        ProductInfoRequest request = new ProductInfoRequest(productId, customerId, orderId);
+        EventDto eventDto = EventDto.builder()
+                .eventType("PRODUCT_INFO_REQUEST")
+                .orderId(orderId)
+                .productId(productId)
+                .customerId(customerId)
+                .build();
+
+//        ProductInfoRequest request = new ProductInfoRequest(productId, customerId, orderId);
         try {
-            String value = objectMapper.writeValueAsString(request);
+            String value = objectMapper.writeValueAsString(eventDto);
             futureMap.put(orderId, future);
             log.info("Sending product info request for orderId: {}", orderId);
             kafkaTemplate.send("product-info-request", productId.toString(), value);
@@ -103,24 +123,21 @@ public class OrderService {
     @KafkaListener(topics = "product-info-response", groupId = "order-service")
     public void handleProductInfoResponse(String message) {
         try {
-            log.info("Received product info response: {}", message);
-
-            ProductDto productDto = objectMapper.readValue(message, ProductDto.class);
-            if (productDto.getOrderId() == null) {
-                log.error("Received ProductDto with null orderId: {}", productDto);
+            EventDto eventDto = objectMapper.readValue(message, EventDto.class);
+            if (eventDto.getOrderId() == null) {
                 return;
             }
-            CompletableFuture<ProductDto> future = futureMap.get(productDto.getOrderId());
+            CompletableFuture<ProductDto> future = futureMap.get(eventDto.getOrderId());
             if (future != null) {
+                ProductDto productDto = objectMapper.convertValue(eventDto.getData(), ProductDto.class);
                 future.complete(productDto);
-                log.info("Completed future for orderId: {}", productDto.getOrderId());  // 로그 추가
+                log.info("Completed future for orderId: {}", eventDto.getOrderId());
+                updateOrderItem(eventDto.getOrderId(), productDto);
             } else {
-                log.warn("No future found for orderId: {}", productDto.getOrderId());  // 로그 추가
+                log.warn("No future found for orderId: {}", eventDto.getOrderId());
             }
-            updateOrderItem(productDto.getOrderId(), productDto);
         } catch (Exception e) {
-            log.error("Error processing product info response", e);  // 로그 추가
-
+            log.error("Error processing product info response", e);
         }
     }
 
@@ -141,18 +158,14 @@ public class OrderService {
 
         orderItem.setProductName(productDto.getProductName());
         orderItem.setPrice(productDto.getPrice() * orderItem.getQuantity());
-
         log.info("Updating OrderItem: {}", orderItem);
-
         orderRepository.save(order);
     }
 
+    //내 주문 수정하기 (수량)
 
-    public List<OrderDto> getOrderList(Long customerId) {
-        return orderRepository.findAllByCustomerIdWithItems(customerId).stream()
-                .map(OrderDto::from)
-                .collect(Collectors.toList());
-    }
+
+
 //    public Order createPendingOrder(Long customerId) {
 //        Customer customer = customerRepository.findById(customerId)
 //                .orElseThrow(NotFoundMemberException::new);
@@ -269,20 +282,5 @@ public class OrderService {
 //
 //        orderItemRepository.delete(orderItem);
 //        return getOrderList(customerId);
-//    }
-//
-//    // 주문 객체 자체를 삭제하는 메서드 -> 사용하지 않음
-//
-//    // 관리자가 모든 주문을 확인하는 용도 -> 보류
-//    public List<OrderDto> findAllOrders() {
-//        List<Order> orders = orderRepository.findAll();
-//        return orders.stream().map(OrderDto::from)
-//                .collect(Collectors.toList());
-//    }
-//
-//    public List<OrderDto> getOrderListByCustomerId(Long customerId) {
-//        return orderRepository.findByCustomerId(customerId).stream()
-//                .map(OrderDto::from)
-//                .collect(Collectors.toList());
 //    }
 }
