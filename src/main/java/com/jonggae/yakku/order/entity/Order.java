@@ -34,11 +34,20 @@ public class Order {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
     private List<OrderItem> orderItemList = new ArrayList<>();
 
+    private boolean isActive;
 
     //주문 확정용
     public void confirmOrder() {
+        if (this.orderStatus != OrderStatus.PENDING_ORDER) {
+            throw new IllegalStateException("Can only confirm pending orders.");
+        }
         this.orderStatus = OrderStatus.PENDING_PAYMENT;
-        this.orderDate = LocalDateTime.now();
+        this.isActive = false;
+    }
+
+    // 현재 활성화된 주문인가를 식별
+    public boolean isActive() {
+        return isActive;
     }
 
     public void updateOrderStatus(OrderStatus newStatus) {

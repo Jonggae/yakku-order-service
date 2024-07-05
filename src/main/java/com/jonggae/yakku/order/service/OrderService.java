@@ -22,6 +22,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
@@ -47,8 +48,11 @@ public class OrderService {
     // 주문에 상품 추가하기
     public OrderDto addProductToOrder(Long customerId, Long productId, int quantity) {
         try {
-            Order order = orderRepository.findPendingOrderByCustomerId(customerId)
+            Order order = orderRepository.findActiveOrderByCustomerId(customerId)
                     .orElseGet(() -> createNewOrder(customerId));
+            if (!order.isActive()) {
+                order = createNewOrder(customerId);
+            }
 
             OrderItem orderItem = OrderItem.builder()
                     .productId(productId)
@@ -88,11 +92,13 @@ public class OrderService {
     }
 
     private Order createNewOrder(Long customerId) {
-        Order newOrder = new Order();
-        newOrder.setCustomerId(customerId);
-        newOrder.setOrderDate(LocalDateTime.now());
-        newOrder.setOrderStatus(OrderStatus.PENDING_ORDER);
-        return newOrder;
+        return Order.builder()
+                .customerId(customerId)
+                .orderDate(LocalDateTime.now())
+                .orderStatus(OrderStatus.PENDING_ORDER)
+                .orderItemList(new ArrayList<>())
+                .isActive(true)
+               .build();
     }
 
     private void requestProductInfo(Long productId, Long customerId, Long orderId, CompletableFuture<ProductDto> future) {
@@ -166,12 +172,14 @@ public class OrderService {
 
     // 주문 확정
     @Transactional
-    public OrderDto confirmOrder(Long customerId, Long orderId) {
+    public void confirmOrder(Long customerId, Long orderId) {
         Order existingOrder = orderRepository.findByIdAndCustomerId(orderId, customerId)
                 .orElseThrow(NotFoundOrderException::new);
         existingOrder.validateOrderStatusForUpdate();
         existingOrder.confirmOrder();
         Order savedOrder = orderRepository.save(existingOrder);
+
+        createNewOrder(customerId);
 
         EventDto eventDto = EventDto.builder()
                 .eventType("ORDER_CONFIRMED")
@@ -185,12 +193,12 @@ public class OrderService {
         } catch (JsonProcessingException e) {
             log.error("주문 과정에 문제가 생겼습니다.", e);
         }
-        return OrderDto.from(savedOrder);
+        OrderDto.from(savedOrder);
     }
 
     // 주문 취소
     @Transactional
-    public OrderDto cancelOrderByCustomer(Long orderId, Long customerId) {
+    public void cancelOrderByCustomer(Long orderId, Long customerId) {
         Order order = orderRepository.findByIdAndCustomerId(orderId, customerId)
                 .orElseThrow(NotFoundOrderException::new);
 
@@ -213,7 +221,7 @@ public class OrderService {
                 log.error("Error publishing order cancelled event", e);
             }
 
-            return OrderDto.from(savedOrder);
+            OrderDto.from(savedOrder);
         } else {
             throw new IllegalStateException("결제 완료나 주문 완료된 주문만 취소 가능합니다.");
         }
@@ -221,9 +229,16 @@ public class OrderService {
 
     //주문 상태 업데이트 todo : 자동으로 진행될 수 있나요..?
     @Transactional
-    public OrderDto updateOrderStatus(Long orderId, OrderStatus newStatus) {
+    public void updateOrderStatus(Long orderId, OrderStatus newStatus) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(NotFoundOrderException::new);
+
+        if (order.isActive() &&
+                (newStatus == OrderStatus.PENDING_PAYMENT || newStatus == OrderStatus.CANCELLED)) {
+            order.setActive(false);
+            createNewOrder(order.getCustomerId());
+        }
+
         order.updateOrderStatus(newStatus);
         Order savedOrder = orderRepository.save(order);
 
@@ -242,7 +257,7 @@ public class OrderService {
             log.error("Error publishing order status updated event", e);
         }
 
-        return OrderDto.from(savedOrder);
+        OrderDto.from(savedOrder);
     }
 
     // 주문 수량 변경
