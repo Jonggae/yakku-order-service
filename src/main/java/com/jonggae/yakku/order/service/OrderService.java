@@ -7,12 +7,12 @@ import com.jonggae.yakku.exceptions.NotFoundOrderException;
 import com.jonggae.yakku.exceptions.NotFoundOrderItemException;
 import com.jonggae.yakku.exceptions.OrderProcessingException;
 import com.jonggae.yakku.kafka.EventDto;
-import com.jonggae.yakku.order.dto.OrderDto;
 import com.jonggae.yakku.kafka.kafkaDto.ProductDto;
-import com.jonggae.yakku.kafka.kafkaDto.ProductInfoRequest;
+import com.jonggae.yakku.order.dto.OrderDto;
 import com.jonggae.yakku.order.entity.Order;
 import com.jonggae.yakku.order.entity.OrderItem;
 import com.jonggae.yakku.order.entity.OrderStatus;
+import com.jonggae.yakku.order.repository.OrderItemRepository;
 import com.jonggae.yakku.order.repository.OrderRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Map<Long, CompletableFuture<ProductDto>> futureMap = new ConcurrentHashMap<>();
@@ -42,6 +43,7 @@ public class OrderService {
                 .map(OrderDto::from)
                 .collect(Collectors.toList());
     }
+
     // 주문에 상품 추가하기
     public OrderDto addProductToOrder(Long customerId, Long productId, int quantity) {
         try {
@@ -162,8 +164,146 @@ public class OrderService {
         orderRepository.save(order);
     }
 
-    //내 주문 수정하기 (수량)
+    // 주문 확정
+    @Transactional
+    public OrderDto confirmOrder(Long customerId, Long orderId) {
+        Order existingOrder = orderRepository.findByIdAndCustomerId(orderId, customerId)
+                .orElseThrow(NotFoundOrderException::new);
+        existingOrder.validateOrderStatusForUpdate();
+        existingOrder.confirmOrder();
+        Order savedOrder = orderRepository.save(existingOrder);
 
+        EventDto eventDto = EventDto.builder()
+                .eventType("ORDER_CONFIRMED")
+                .orderId(orderId)
+                .customerId(customerId)
+                .data(Map.of("orderStatus", OrderStatus.PENDING_PAYMENT)).build();
+
+        try {
+            String eventMessage = objectMapper.writeValueAsString(eventDto);
+            kafkaTemplate.send("order-events", eventMessage);
+        } catch (JsonProcessingException e) {
+            log.error("주문 과정에 문제가 생겼습니다.", e);
+        }
+        return OrderDto.from(savedOrder);
+    }
+
+    // 주문 취소
+    @Transactional
+    public OrderDto cancelOrderByCustomer(Long orderId, Long customerId) {
+        Order order = orderRepository.findByIdAndCustomerId(orderId, customerId)
+                .orElseThrow(NotFoundOrderException::new);
+
+        if (order.getOrderStatus() == OrderStatus.PAID || order.getOrderStatus() == OrderStatus.PENDING_PAYMENT) {
+            order.updateOrderStatus(OrderStatus.CANCELLED);
+            Order savedOrder = orderRepository.save(order);
+
+            // 주문 취소 이벤트 발행
+            EventDto eventDto = EventDto.builder()
+                    .eventType("ORDER_CANCELLED")
+                    .orderId(orderId)
+                    .customerId(customerId)
+                    .data(Map.of("orderStatus", OrderStatus.CANCELLED.name()))
+                    .build();
+
+            try {
+                String eventMessage = objectMapper.writeValueAsString(eventDto);
+                kafkaTemplate.send("order-events", eventMessage);
+            } catch (JsonProcessingException e) {
+                log.error("Error publishing order cancelled event", e);
+            }
+
+            return OrderDto.from(savedOrder);
+        } else {
+            throw new IllegalStateException("결제 완료나 주문 완료된 주문만 취소 가능합니다.");
+        }
+    }
+
+    //주문 상태 업데이트 todo : 자동으로 진행될 수 있나요..?
+    @Transactional
+    public OrderDto updateOrderStatus(Long orderId, OrderStatus newStatus) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(NotFoundOrderException::new);
+        order.updateOrderStatus(newStatus);
+        Order savedOrder = orderRepository.save(order);
+
+        // 주문 상태 변경 이벤트 발행
+        EventDto eventDto = EventDto.builder()
+                .eventType("ORDER_STATUS_UPDATED")
+                .orderId(orderId)
+                .customerId(order.getCustomerId())
+                .data(Map.of("newStatus", newStatus.name()))
+                .build();
+
+        try {
+            String eventMessage = objectMapper.writeValueAsString(eventDto);
+            kafkaTemplate.send("order-events", eventMessage);
+        } catch (JsonProcessingException e) {
+            log.error("Error publishing order status updated event", e);
+        }
+
+        return OrderDto.from(savedOrder);
+    }
+
+    // 주문 수량 변경
+    @Transactional
+    public OrderDto updateOrderItemQuantity(Long customerId, Long orderItemId, int newQuantity) {
+        OrderItem orderItem = orderItemRepository.findById(orderItemId)
+                .orElseThrow(NotFoundOrderItemException::new);
+
+        Order order = orderItem.getOrder();
+        order.validateOrderStatusForUpdate();
+
+        orderItem.setQuantity(newQuantity);
+        orderItemRepository.save(orderItem);
+
+        // 주문 항목 수량 변경 이벤트 발행
+        EventDto eventDto = EventDto.builder()
+                .eventType("ORDER_ITEM_QUANTITY_UPDATED")
+                .orderId(order.getId())
+                .customerId(customerId)
+                .productId(orderItem.getProductId())
+                .data(Map.of("newQuantity", newQuantity))
+                .build();
+
+        try {
+            String eventMessage = objectMapper.writeValueAsString(eventDto);
+            kafkaTemplate.send("order-events", eventMessage);
+        } catch (JsonProcessingException e) {
+            log.error("Error publishing order item quantity updated event", e);
+        }
+
+        return OrderDto.from(order);
+    }
+
+    //주문 항목 삭제
+    @Transactional
+    public OrderDto deleteOrderItem(Long customerId, Long orderItemId) {
+        OrderItem orderItem = orderItemRepository.findById(orderItemId)
+                .orElseThrow(NotFoundOrderItemException::new);
+
+        Order order = orderItem.getOrder();
+        order.getOrderItemList().remove(orderItem);
+        orderItemRepository.delete(orderItem);
+
+        // 주문 항목 삭제 이벤트 발행
+        EventDto eventDto = EventDto.builder()
+                .eventType("ORDER_ITEM_DELETED")
+                .orderId(order.getId())
+                .customerId(customerId)
+                .productId(orderItem.getProductId())
+                .data(Map.of("quantity", orderItem.getQuantity()))
+                .build();
+
+        try {
+            String eventMessage = objectMapper.writeValueAsString(eventDto);
+            kafkaTemplate.send("order-events", eventMessage);
+        } catch (JsonProcessingException e) {
+            log.error("Error publishing order item deleted event", e);
+        }
+
+        return OrderDto.from(order);
+    }
 
 
 //    public Order createPendingOrder(Long customerId) {
