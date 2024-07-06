@@ -3,8 +3,8 @@ package com.jonggae.yakku.order.controller;
 import com.jonggae.yakku.common.apiResponse.ApiResponseDto;
 import com.jonggae.yakku.common.apiResponse.ApiResponseUtil;
 import com.jonggae.yakku.common.messageUtil.MessageUtil;
+import com.jonggae.yakku.order.dto.AddProductToOrderRequestDto;
 import com.jonggae.yakku.order.dto.OrderDto;
-import com.jonggae.yakku.kafka.kafkaDto.AddProductRequest;
 import com.jonggae.yakku.order.entity.OrderStatus;
 import com.jonggae.yakku.order.messages.OrderApiMessages;
 import com.jonggae.yakku.order.service.OrderService;
@@ -28,9 +28,9 @@ public class OrderApiController {
     private final OrderService orderService;
 
     @PostMapping
-    public ResponseEntity<ApiResponseDto<OrderDto>> addProductToOrder(@RequestBody AddProductRequest request,
+    public ResponseEntity<ApiResponseDto<OrderDto>> addProductToOrder(@RequestBody AddProductToOrderRequestDto request,
                                                                       @RequestHeader("customerId") Long customerId) {
-        OrderDto orderDto = orderService.addProductToOrder(customerId, request.getProductId(), request.getQuantity());
+        OrderDto orderDto = orderService.addProductToOrder(customerId,request);
         return ApiResponseUtil.success(ORDER_ADD_SUCCESS, orderDto, 200);
     }
 

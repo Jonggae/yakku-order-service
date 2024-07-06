@@ -1,4 +1,4 @@
-package com.jonggae.yakku.kafka.kafkaDto;
+package com.jonggae.yakku.order.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -12,9 +12,7 @@ import lombok.NoArgsConstructor;
 public class ProductDto {
     private Long id;
     private String productDescription;
-    private Long productId;
     private String productName;
-    private Long orderId;
     private Long price;
-    private int stock;
+    private Long stock;
 }

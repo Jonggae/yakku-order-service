@@ -2,13 +2,14 @@ package com.jonggae.yakku.order.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jonggae.yakku.exceptions.InvalidProductDataException;
+import com.jonggae.yakku.common.apiResponse.ApiResponseDto;
 import com.jonggae.yakku.exceptions.NotFoundOrderException;
 import com.jonggae.yakku.exceptions.NotFoundOrderItemException;
-import com.jonggae.yakku.exceptions.OrderProcessingException;
 import com.jonggae.yakku.kafka.EventDto;
-import com.jonggae.yakku.kafka.kafkaDto.ProductDto;
+import com.jonggae.yakku.order.controller.ProductClient;
+import com.jonggae.yakku.order.dto.AddProductToOrderRequestDto;
 import com.jonggae.yakku.order.dto.OrderDto;
+import com.jonggae.yakku.order.dto.ProductDto;
 import com.jonggae.yakku.order.entity.Order;
 import com.jonggae.yakku.order.entity.OrderItem;
 import com.jonggae.yakku.order.entity.OrderStatus;
@@ -17,15 +18,17 @@ import com.jonggae.yakku.order.repository.OrderRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.http.ResponseEntity;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -35,9 +38,10 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
+    private final ProductClient productClient;
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final Map<Long, CompletableFuture<ProductDto>> futureMap = new ConcurrentHashMap<>();
+    private final RestTemplate restTemplate;
 
     public List<OrderDto> getOrderList(Long customerId) {
         return orderRepository.findAllByCustomerIdWithItems(customerId).stream()
@@ -46,51 +50,29 @@ public class OrderService {
     }
 
     // 주문에 상품 추가하기
-    public OrderDto addProductToOrder(Long customerId, Long productId, int quantity) {
-        try {
-            Order order = orderRepository.findActiveOrderByCustomerId(customerId)
-                    .orElseGet(() -> createNewOrder(customerId));
-            if (!order.isActive()) {
-                order = createNewOrder(customerId);
-            }
+    @Transactional
+    public OrderDto addProductToOrder(Long customerId, AddProductToOrderRequestDto requestDto) {
+        Order order = orderRepository.findActiveOrderByCustomerId(customerId)
+                .orElseGet(() -> createNewOrder(customerId));
 
-            OrderItem orderItem = OrderItem.builder()
-                    .productId(productId)
-                    .quantity(quantity)
-                    .order(order)
-                    .build();
-            order.getOrderItemList().add(orderItem);
+        ProductDto productDto = productClient.getProductOrderInfo(requestDto.getProductId());
 
-            Order savedOrder = orderRepository.save(order);
+        OrderItem orderItem = OrderItem.builder()
+                .productId(productDto.getId())
+                .productName(productDto.getProductName())
+                .quantity(requestDto.getQuantity())
+                .price(productDto.getPrice())
+                .order(order)
+                .build();
 
-            if (savedOrder.getId() == null) {
-                throw new IllegalStateException("Saved order has null id");
-            }
-            CompletableFuture<ProductDto> future = new CompletableFuture<>();
-            requestProductInfo(productId, customerId, savedOrder.getId(), future);
+        order.getOrderItemList().add(orderItem);
+        Order savedOrder = orderRepository.save(order);
 
-            try {
-                // 최대 10초 대기
-                ProductDto productDto = future.get(10, TimeUnit.SECONDS);
-                updateOrderItem(savedOrder.getId(), productDto);
-                return OrderDto.from(orderRepository.findById(savedOrder.getId()).orElseThrow());
-            } catch (ExecutionException e) {
-
-                if (e.getCause() instanceof InvalidProductDataException) {
-                    orderRepository.delete(savedOrder);  // 주문 삭제
-                    throw new OrderProcessingException("상품 정보를 가져오는데 실패했습니다. 다시 시도해주세요.", e);
-                }
-                throw new OrderProcessingException("주문 처리 중 실행 오류가 발생했습니다.", e);
-            } catch (TimeoutException e) {
-                orderRepository.delete(savedOrder);  // 주문 삭제
-                throw new OrderProcessingException("주문 처리 시간이 초과되었습니다. 다시 시도해주세요.", e);
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new OrderProcessingException("주문 처리 중 인터럽트 발생", e);
-        }
+        return OrderDto.from(savedOrder);
     }
 
+
+    // 만약 주문함 자체가 없다면 생성 (주문 확정으로 인해 없을 수 있음)
     private Order createNewOrder(Long customerId) {
         return Order.builder()
                 .customerId(customerId)
@@ -98,79 +80,10 @@ public class OrderService {
                 .orderStatus(OrderStatus.PENDING_ORDER)
                 .orderItemList(new ArrayList<>())
                 .isActive(true)
-               .build();
-    }
-
-    private void requestProductInfo(Long productId, Long customerId, Long orderId, CompletableFuture<ProductDto> future) {
-        if (orderId == null) {
-            log.error("Cannot request product info with null orderId");
-            future.completeExceptionally(new IllegalArgumentException("orderId cannot be null"));
-            return;
-        }
-
-        EventDto eventDto = EventDto.builder()
-                .eventType("PRODUCT_INFO_REQUEST")
-                .orderId(orderId)
-                .productId(productId)
-                .customerId(customerId)
                 .build();
-
-//        ProductInfoRequest request = new ProductInfoRequest(productId, customerId, orderId);
-        try {
-            String value = objectMapper.writeValueAsString(eventDto);
-            futureMap.put(orderId, future);
-            log.info("Sending product info request for orderId: {}", orderId);
-            kafkaTemplate.send("product-info-request", productId.toString(), value);
-        } catch (JsonProcessingException e) {
-            log.error("Error processing product info request", e);
-            future.completeExceptionally(e);
-        }
     }
 
-    @Transactional
-    @KafkaListener(topics = "product-info-response", groupId = "order-service")
-    public void handleProductInfoResponse(String message) {
-        try {
-            EventDto eventDto = objectMapper.readValue(message, EventDto.class);
-            if (eventDto.getOrderId() == null) {
-                return;
-            }
-            CompletableFuture<ProductDto> future = futureMap.get(eventDto.getOrderId());
-            if (future != null) {
-                ProductDto productDto = objectMapper.convertValue(eventDto.getData(), ProductDto.class);
-                future.complete(productDto);
-                log.info("Completed future for orderId: {}", eventDto.getOrderId());
-                updateOrderItem(eventDto.getOrderId(), productDto);
-            } else {
-                log.warn("No future found for orderId: {}", eventDto.getOrderId());
-            }
-        } catch (Exception e) {
-            log.error("Error processing product info response", e);
-        }
-    }
-
-    @Transactional
-    protected void updateOrderItem(Long orderId, ProductDto productDto) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(NotFoundOrderException::new);
-        log.debug("Order found: {}, OrderItems: {}", orderId, order.getOrderItemList());
-
-        OrderItem orderItem = order.getOrderItemList().stream()
-                .peek(item -> log.debug("Checking OrderItem: productId={}, orderId={}", item.getProductId(), item.getOrder().getId()))
-                .filter(item -> item.getProductId().equals(productDto.getId()))
-                .findFirst()
-                .orElseThrow(() -> {
-                    log.error("OrderItem not found for orderId: {} and productId: {}", orderId, productDto.getId());
-                    return new NotFoundOrderItemException();
-                });
-
-        orderItem.setProductName(productDto.getProductName());
-        orderItem.setPrice(productDto.getPrice() * orderItem.getQuantity());
-        log.info("Updating OrderItem: {}", orderItem);
-        orderRepository.save(order);
-    }
-
-    // 주문 확정
+    // 주문 확정 -> 재고가 실제로 감소해야할까? 아니면 결제까지 이어져야 할까  Payment와 관련이 있을것
     @Transactional
     public void confirmOrder(Long customerId, Long orderId) {
         Order existingOrder = orderRepository.findByIdAndCustomerId(orderId, customerId)
@@ -262,7 +175,7 @@ public class OrderService {
 
     // 주문 수량 변경
     @Transactional
-    public OrderDto updateOrderItemQuantity(Long customerId, Long orderItemId, int newQuantity) {
+    public void updateOrderItemQuantity(Long customerId, Long orderItemId, int newQuantity) {
         OrderItem orderItem = orderItemRepository.findById(orderItemId)
                 .orElseThrow(NotFoundOrderItemException::new);
 
@@ -288,12 +201,12 @@ public class OrderService {
             log.error("Error publishing order item quantity updated event", e);
         }
 
-        return OrderDto.from(order);
+        OrderDto.from(order);
     }
 
     //주문 항목 삭제
     @Transactional
-    public OrderDto deleteOrderItem(Long customerId, Long orderItemId) {
+    public void deleteOrderItem(Long customerId, Long orderItemId) {
         OrderItem orderItem = orderItemRepository.findById(orderItemId)
                 .orElseThrow(NotFoundOrderItemException::new);
 
@@ -317,7 +230,7 @@ public class OrderService {
             log.error("Error publishing order item deleted event", e);
         }
 
-        return OrderDto.from(order);
+        OrderDto.from(order);
     }
 
 
