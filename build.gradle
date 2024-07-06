@@ -30,6 +30,7 @@ dependencies {
 
     implementation 'org.springframework.kafka:spring-kafka'
     implementation 'com.fasterxml.jackson.core:jackson-databind'
+    implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
 
 
     runtimeOnly 'mysql:mysql-connector-j'
