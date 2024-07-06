@@ -2,7 +2,6 @@ package com.jonggae.yakku.order.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jonggae.yakku.common.apiResponse.ApiResponseDto;
 import com.jonggae.yakku.exceptions.NotFoundOrderException;
 import com.jonggae.yakku.exceptions.NotFoundOrderItemException;
 import com.jonggae.yakku.kafka.EventDto;
@@ -18,17 +17,14 @@ import com.jonggae.yakku.order.repository.OrderRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -55,6 +51,9 @@ public class OrderService {
         Order order = orderRepository.findActiveOrderByCustomerId(customerId)
                 .orElseGet(() -> createNewOrder(customerId));
 
+        if (order.getOrderStatus() != OrderStatus.PENDING_ORDER) {
+            order = createNewOrder(customerId);
+        }
         ProductDto productDto = productClient.getProductOrderInfo(requestDto.getProductId());
 
         OrderItem orderItem = OrderItem.builder()
@@ -90,22 +89,23 @@ public class OrderService {
                 .orElseThrow(NotFoundOrderException::new);
         existingOrder.validateOrderStatusForUpdate();
         existingOrder.confirmOrder();
+        existingOrder.setActive(false);
         Order savedOrder = orderRepository.save(existingOrder);
 
         createNewOrder(customerId);
-
-        EventDto eventDto = EventDto.builder()
-                .eventType("ORDER_CONFIRMED")
-                .orderId(orderId)
-                .customerId(customerId)
-                .data(Map.of("orderStatus", OrderStatus.PENDING_PAYMENT)).build();
-
-        try {
-            String eventMessage = objectMapper.writeValueAsString(eventDto);
-            kafkaTemplate.send("order-events", eventMessage);
-        } catch (JsonProcessingException e) {
-            log.error("주문 과정에 문제가 생겼습니다.", e);
-        }
+//
+//        EventDto eventDto = EventDto.builder()
+//                .eventType("ORDER_CONFIRMED")
+//                .orderId(orderId)
+//                .customerId(customerId)
+//                .data(Map.of("orderStatus", OrderStatus.PENDING_PAYMENT)).build();
+//
+//        try {
+//            String eventMessage = objectMapper.writeValueAsString(eventDto);
+//            kafkaTemplate.send("order-events", eventMessage);
+//        } catch (JsonProcessingException e) {
+//            log.error("주문 과정에 문제가 생겼습니다.", e);
+//        }
         OrderDto.from(savedOrder);
     }
 
@@ -120,19 +120,19 @@ public class OrderService {
             Order savedOrder = orderRepository.save(order);
 
             // 주문 취소 이벤트 발행
-            EventDto eventDto = EventDto.builder()
-                    .eventType("ORDER_CANCELLED")
-                    .orderId(orderId)
-                    .customerId(customerId)
-                    .data(Map.of("orderStatus", OrderStatus.CANCELLED.name()))
-                    .build();
-
-            try {
-                String eventMessage = objectMapper.writeValueAsString(eventDto);
-                kafkaTemplate.send("order-events", eventMessage);
-            } catch (JsonProcessingException e) {
-                log.error("Error publishing order cancelled event", e);
-            }
+//            EventDto eventDto = EventDto.builder()
+//                    .eventType("ORDER_CANCELLED")
+//                    .orderId(orderId)
+//                    .customerId(customerId)
+//                    .data(Map.of("orderStatus", OrderStatus.CANCELLED.name()))
+//                    .build();
+//
+//            try {
+//                String eventMessage = objectMapper.writeValueAsString(eventDto);
+//                kafkaTemplate.send("order-events", eventMessage);
+//            } catch (JsonProcessingException e) {
+//                log.error("Error publishing order cancelled event", e);
+//            }
 
             OrderDto.from(savedOrder);
         } else {
@@ -155,20 +155,20 @@ public class OrderService {
         order.updateOrderStatus(newStatus);
         Order savedOrder = orderRepository.save(order);
 
-        // 주문 상태 변경 이벤트 발행
-        EventDto eventDto = EventDto.builder()
-                .eventType("ORDER_STATUS_UPDATED")
-                .orderId(orderId)
-                .customerId(order.getCustomerId())
-                .data(Map.of("newStatus", newStatus.name()))
-                .build();
-
-        try {
-            String eventMessage = objectMapper.writeValueAsString(eventDto);
-            kafkaTemplate.send("order-events", eventMessage);
-        } catch (JsonProcessingException e) {
-            log.error("Error publishing order status updated event", e);
-        }
+//        // 주문 상태 변경 이벤트 발행
+//        EventDto eventDto = EventDto.builder()
+//                .eventType("ORDER_STATUS_UPDATED")
+//                .orderId(orderId)
+//                .customerId(order.getCustomerId())
+//                .data(Map.of("newStatus", newStatus.name()))
+//                .build();
+//
+//        try {
+//            String eventMessage = objectMapper.writeValueAsString(eventDto);
+//            kafkaTemplate.send("order-events", eventMessage);
+//        } catch (JsonProcessingException e) {
+//            log.error("Error publishing order status updated event", e);
+//        }
 
         OrderDto.from(savedOrder);
     }
@@ -185,21 +185,21 @@ public class OrderService {
         orderItem.setQuantity(newQuantity);
         orderItemRepository.save(orderItem);
 
-        // 주문 항목 수량 변경 이벤트 발행
-        EventDto eventDto = EventDto.builder()
-                .eventType("ORDER_ITEM_QUANTITY_UPDATED")
-                .orderId(order.getId())
-                .customerId(customerId)
-                .productId(orderItem.getProductId())
-                .data(Map.of("newQuantity", newQuantity))
-                .build();
-
-        try {
-            String eventMessage = objectMapper.writeValueAsString(eventDto);
-            kafkaTemplate.send("order-events", eventMessage);
-        } catch (JsonProcessingException e) {
-            log.error("Error publishing order item quantity updated event", e);
-        }
+//        // 주문 항목 수량 변경 이벤트 발행
+//        EventDto eventDto = EventDto.builder()
+//                .eventType("ORDER_ITEM_QUANTITY_UPDATED")
+//                .orderId(order.getId())
+//                .customerId(customerId)
+//                .productId(orderItem.getProductId())
+//                .data(Map.of("newQuantity", newQuantity))
+//                .build();
+//
+//        try {
+//            String eventMessage = objectMapper.writeValueAsString(eventDto);
+//            kafkaTemplate.send("order-events", eventMessage);
+//        } catch (JsonProcessingException e) {
+//            log.error("Error publishing order item quantity updated event", e);
+//        }
 
         OrderDto.from(order);
     }
@@ -214,21 +214,21 @@ public class OrderService {
         order.getOrderItemList().remove(orderItem);
         orderItemRepository.delete(orderItem);
 
-        // 주문 항목 삭제 이벤트 발행
-        EventDto eventDto = EventDto.builder()
-                .eventType("ORDER_ITEM_DELETED")
-                .orderId(order.getId())
-                .customerId(customerId)
-                .productId(orderItem.getProductId())
-                .data(Map.of("quantity", orderItem.getQuantity()))
-                .build();
-
-        try {
-            String eventMessage = objectMapper.writeValueAsString(eventDto);
-            kafkaTemplate.send("order-events", eventMessage);
-        } catch (JsonProcessingException e) {
-            log.error("Error publishing order item deleted event", e);
-        }
+//        // 주문 항목 삭제 이벤트 발행
+//        EventDto eventDto = EventDto.builder()
+//                .eventType("ORDER_ITEM_DELETED")
+//                .orderId(order.getId())
+//                .customerId(customerId)
+//                .productId(orderItem.getProductId())
+//                .data(Map.of("quantity", orderItem.getQuantity()))
+//                .build();
+//
+//        try {
+//            String eventMessage = objectMapper.writeValueAsString(eventDto);
+//            kafkaTemplate.send("order-events", eventMessage);
+//        } catch (JsonProcessingException e) {
+//            log.error("Error publishing order item deleted event", e);
+//        }
 
         OrderDto.from(order);
     }
