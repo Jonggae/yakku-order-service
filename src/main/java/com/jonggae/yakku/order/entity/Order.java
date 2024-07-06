@@ -1,10 +1,7 @@
 package com.jonggae.yakku.order.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -16,6 +13,7 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 @Getter
+@Setter
 @Table(name = "orders")
 public class Order {
 
@@ -24,6 +22,8 @@ public class Order {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    private Long customerId;
+
     @Column(name = "order_date", nullable = false)
     private LocalDateTime orderDate; //주문 시간
 
@@ -31,15 +31,23 @@ public class Order {
     @Enumerated(EnumType.STRING)
     private OrderStatus orderStatus;
 
-    private Long customerId;
-
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
     private List<OrderItem> orderItemList = new ArrayList<>();
 
+    private boolean isActive;
+
     //주문 확정용
     public void confirmOrder() {
+        if (this.orderStatus != OrderStatus.PENDING_ORDER) {
+            throw new IllegalStateException("Can only confirm pending orders.");
+        }
         this.orderStatus = OrderStatus.PENDING_PAYMENT;
-        this.orderDate = LocalDateTime.now();
+        this.isActive = false;
+    }
+
+    // 현재 활성화된 주문인가를 식별
+    public boolean isActive() {
+        return isActive;
     }
 
     public void updateOrderStatus(OrderStatus newStatus) {

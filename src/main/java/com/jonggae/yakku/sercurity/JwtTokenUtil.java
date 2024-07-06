@@ -51,30 +51,7 @@ public class JwtTokenUtil {
         return false;
     }
 
-    public String getCustomerIdFromToken(String token) {
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(key)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
-        Integer customerId = claims.get("customerId", Integer.class);
-        if (customerId != null) {
-            logger.info("CustomerId from token: {}", customerId);
-            return customerId.toString();
-        }
-        return null;
-    }
 
-    public String getCustomerNameFromToken(String token) {
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(key)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
-        logger.info("CustomerName from token: {}", claims.getSubject());
-
-        return claims.getSubject();
-    }
 
     public Authentication getAuthentication(String token) {
         Claims claims = Jwts
