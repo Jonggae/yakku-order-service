@@ -41,7 +41,7 @@ public class Order {
         if (this.orderStatus != OrderStatus.PENDING_ORDER) {
             throw new IllegalStateException("Can only confirm pending orders.");
         }
-        this.orderStatus = OrderStatus.PENDING_PAYMENT;
+        this.orderStatus = OrderStatus.ORDER_CREATED;
         this.isActive = false;
     }
 

@@ -3,7 +3,7 @@ package com.jonggae.yakku.order.controller;
 import com.jonggae.yakku.common.apiResponse.ApiResponseDto;
 import com.jonggae.yakku.common.apiResponse.ApiResponseUtil;
 import com.jonggae.yakku.common.messageUtil.MessageUtil;
-import com.jonggae.yakku.order.dto.AddProductToOrderRequestDto;
+import com.jonggae.yakku.order.feignDto.AddProductToOrderRequestDto;
 import com.jonggae.yakku.order.dto.OrderDto;
 import com.jonggae.yakku.order.entity.OrderStatus;
 import com.jonggae.yakku.order.messages.OrderApiMessages;
@@ -77,7 +77,7 @@ public class OrderApiController {
             @RequestHeader("customerId") Long customerId,
             @PathVariable Long orderId,
             @PathVariable Long orderItemId,
-            @RequestParam int newQuantity) {
+            @RequestParam Long newQuantity) {
         orderService.updateOrderItemQuantity(customerId, orderItemId, newQuantity);
         List<OrderDto> updatedOrderList = orderService.getOrderList(customerId);
         return ApiResponseUtil.success(ORDER_UPDATE_SUCCESS, updatedOrderList, 200);

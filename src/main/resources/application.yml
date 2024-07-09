@@ -41,6 +41,7 @@ jwt:
       key: ${JWT_REFRESH_SECRET_KEY}
   expiration_time: 3600
   refresh_expiration_time: 604800
+
 logging:
     level:
       org.springframework.security: debug

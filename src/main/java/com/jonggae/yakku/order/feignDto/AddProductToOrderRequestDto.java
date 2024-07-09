@@ -1,4 +1,4 @@
-package com.jonggae.yakku.order.dto;
+package com.jonggae.yakku.order.feignDto;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -11,5 +11,5 @@ import lombok.Setter;
 @AllArgsConstructor
 public class AddProductToOrderRequestDto {
     private Long productId;
-    private int quantity;
+    private Long quantity;
 }
