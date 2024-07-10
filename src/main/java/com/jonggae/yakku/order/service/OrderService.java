@@ -88,12 +88,13 @@ public class OrderService {
     }
 
     // 주문 확정 -> 재고가 실제로 감소하는 시점 ,
-    // 현재 payment-Service와 연결하여 바로 결제가 완료되는것으로 설정함
+
     @Transactional
-    public OrderDto confirmOrder(Long customerId, Long orderId) {
+    public void confirmOrder(Long customerId, Long orderId) {
         Order existingOrder = orderRepository.findByIdAndCustomerId(orderId, customerId)
                 .orElseThrow(NotFoundOrderException::new);
         existingOrder.validateOrderStatusForUpdate();
+
         // 각 상품의 재고 감소
         for (OrderItem item: existingOrder.getOrderItemList()){
             boolean stockReserved = productClient.reserveStock(
@@ -136,7 +137,7 @@ public class OrderService {
         //todo : 재고 DB 동기화 로직 필요
         //productClient.syncStockToDatabase(); 같은것
 
-        return OrderDto.from(savedOrder);
+        OrderDto.from(savedOrder);
     }
 
     private void rollbackStock(Order order) {
