@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+// 일반 구매와 예약 구매를 따로 분리함
 
 @Slf4j
 @Service
@@ -36,8 +37,7 @@ public class OrderService {
     private final OrderItemRepository orderItemRepository;
     private final ProductClient productClient;
     private final PaymentClient paymentClient;
-//    private final KafkaTemplate<String, String> kafkaTemplate;
-//    private final RestTemplate restTemplate;
+
 
     public List<OrderDto> getOrderList(Long customerId) {
         return orderRepository.findAllByCustomerIdWithItems(customerId).stream()
@@ -87,8 +87,7 @@ public class OrderService {
                 .build();
     }
 
-    // 주문 확정 -> 재고가 실제로 감소하는 시점 ,
-
+    // 주문 확정 -> 재고가 실제로 감소하는 시점
     @Transactional
     public void confirmOrder(Long customerId, Long orderId) {
         Order existingOrder = orderRepository.findByIdAndCustomerId(orderId, customerId)
@@ -121,22 +120,6 @@ public class OrderService {
         }
         savedOrder = orderRepository.save(savedOrder);
         createNewOrder(customerId);
-//
-//        EventDto eventDto = EventDto.builder()
-//                .eventType("ORDER_CONFIRMED")
-//                .orderId(orderId)
-//                .customerId(customerId)
-//                .data(Map.of("orderStatus", OrderStatus.PENDING_PAYMENT)).build();
-//
-//        try {
-//            String eventMessage = objectMapper.writeValueAsString(eventDto);
-//            kafkaTemplate.send("order-events", eventMessage);
-//        } catch (JsonProcessingException e) {
-//            log.error("주문 과정에 문제가 생겼습니다.", e);
-//        }
-        //todo : 재고 DB 동기화 로직 필요
-        //productClient.syncStockToDatabase(); 같은것
-
         OrderDto.from(savedOrder);
     }
 
@@ -146,6 +129,7 @@ public class OrderService {
             productClient.releaseStock(item.getProductId(), requestDto);
         }
     }
+
     // 주문 취소
     @Transactional
     public void cancelOrderByCustomer(Long orderId, Long customerId) {
@@ -161,25 +145,9 @@ public class OrderService {
                             new StockReservationRequestDto(item.getQuantity())
                     );
                 }
-                // todo : 재고 DB 동기화요청
-
                 order.updateOrderStatus(OrderStatus.CANCELLED);
                 Order savedOrder = orderRepository.save(order);
 
-                // 주문 취소 이벤트 발행
-//            EventDto eventDto = EventDto.builder()
-//                    .eventType("ORDER_CANCELLED")
-//                    .orderId(orderId)
-//                    .customerId(customerId)
-//                    .data(Map.of("orderStatus", OrderStatus.CANCELLED.name()))
-//                    .build();
-//
-//            try {
-//                String eventMessage = objectMapper.writeValueAsString(eventDto);
-//                kafkaTemplate.send("order-events", eventMessage);
-//            } catch (JsonProcessingException e) {
-//                log.error("Error publishing order cancelled event", e);
-//            }
                 log.info("주문 취소 완료: orderId={}, customerId={}", orderId, customerId);
 
                 OrderDto.from(savedOrder);
@@ -206,20 +174,6 @@ public class OrderService {
         order.updateOrderStatus(newStatus);
         Order savedOrder = orderRepository.save(order);
 
-//        // 주문 상태 변경 이벤트 발행
-//        EventDto eventDto = EventDto.builder()
-//                .eventType("ORDER_STATUS_UPDATED")
-//                .orderId(orderId)
-//                .customerId(order.getCustomerId())
-//                .data(Map.of("newStatus", newStatus.name()))
-//                .build();
-//
-//        try {
-//            String eventMessage = objectMapper.writeValueAsString(eventDto);
-//            kafkaTemplate.send("order-events", eventMessage);
-//        } catch (JsonProcessingException e) {
-//            log.error("Error publishing order status updated event", e);
-//        }
 
         OrderDto.from(savedOrder);
     }
@@ -236,22 +190,6 @@ public class OrderService {
         orderItem.setQuantity(newQuantity);
         orderItemRepository.save(orderItem);
 
-//        // 주문 항목 수량 변경 이벤트 발행
-//        EventDto eventDto = EventDto.builder()
-//                .eventType("ORDER_ITEM_QUANTITY_UPDATED")
-//                .orderId(order.getId())
-//                .customerId(customerId)
-//                .productId(orderItem.getProductId())
-//                .data(Map.of("newQuantity", newQuantity))
-//                .build();
-//
-//        try {
-//            String eventMessage = objectMapper.writeValueAsString(eventDto);
-//            kafkaTemplate.send("order-events", eventMessage);
-//        } catch (JsonProcessingException e) {
-//            log.error("Error publishing order item quantity updated event", e);
-//        }
-
         OrderDto.from(order);
     }
 
@@ -264,22 +202,6 @@ public class OrderService {
         Order order = orderItem.getOrder();
         order.getOrderItemList().remove(orderItem);
         orderItemRepository.delete(orderItem);
-
-//        // 주문 항목 삭제 이벤트 발행
-//        EventDto eventDto = EventDto.builder()
-//                .eventType("ORDER_ITEM_DELETED")
-//                .orderId(order.getId())
-//                .customerId(customerId)
-//                .productId(orderItem.getProductId())
-//                .data(Map.of("quantity", orderItem.getQuantity()))
-//                .build();
-//
-//        try {
-//            String eventMessage = objectMapper.writeValueAsString(eventDto);
-//            kafkaTemplate.send("order-events", eventMessage);
-//        } catch (JsonProcessingException e) {
-//            log.error("Error publishing order item deleted event", e);
-//        }
 
         OrderDto.from(order);
     }
