@@ -13,7 +13,7 @@ public class OrderItemDto {
     private Long itemId;
     private Long productId;
     private String productName;
-    private int quantity;
+    private Long quantity;
     private Long price;
 
    public static OrderItemDto from(OrderItem orderItem){

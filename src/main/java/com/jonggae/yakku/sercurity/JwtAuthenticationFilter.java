@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -23,15 +24,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtTokenUtil jwtTokenUtil;
 
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path.startsWith("/api/test/");
+    }
+
+    @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        String path = request.getRequestURI();
-        logger.info("Request path: {}", path);
-
-        if (path.equals("/api/customers/login")) {
+        if (shouldNotFilter(request)) {
             filterChain.doFilter(request, response);
             return;
         }
+
+        String path = request.getRequestURI();
+        logger.info("Request path: {}", path);
 
         String token = extractToken(request.getHeader(HttpHeaders.AUTHORIZATION));
         if (token == null) {

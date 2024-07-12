@@ -41,7 +41,7 @@ public class Order {
         if (this.orderStatus != OrderStatus.PENDING_ORDER) {
             throw new IllegalStateException("Can only confirm pending orders.");
         }
-        this.orderStatus = OrderStatus.PENDING_PAYMENT;
+        this.orderStatus = OrderStatus.ORDER_CREATED;
         this.isActive = false;
     }
 
@@ -58,5 +58,9 @@ public class Order {
         if (this.orderStatus != OrderStatus.PENDING_ORDER) {
             throw new RuntimeException("주문 상태가 대기중이 아니므로 주문 항목을 변경할 수 없습니다.");
         }
+    }
+    public void addOrderItem(OrderItem orderItem) {
+        orderItemList.add(orderItem);
+        orderItem.setOrder(this);
     }
 }
