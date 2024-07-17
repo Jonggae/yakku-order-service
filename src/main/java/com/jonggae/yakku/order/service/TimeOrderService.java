@@ -47,7 +47,7 @@ public class TimeOrderService {
 
     private static final String LOCK_PREFIX = "lock:product:";
     private static final long LOCK_WAIT_TIME = 1000;
-    private static final long LOCK_LEASE_TIME = 2000;
+    private static final long LOCK_LEASE_TIME = 5000;
 
     @Transactional
     public OrderDto createTimeOrder(Long customerId, Long productId, Long quantity) {
