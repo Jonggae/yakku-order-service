@@ -13,8 +13,20 @@ services:
     networks:
       - MSA-network
 
+  redis:
+    image: redis:latest
+    container_name: order_service_redis
+    ports:
+      - 6382:6379
+    volumes:
+      - redis_data:/data
+    networks:
+      - MSA-network
+
+
 volumes:
   mysql_data:
+  redis_data:
 
 networks:
   MSA-network:

@@ -17,6 +17,13 @@ spring:
       hibernate:
         format_sql: true
         show_sql: false
+
+  data:
+    redis:
+      host: order_service_redis
+      port: 6382
+
+
   kafka:
     bootstrap-servers: localhost:9092
     consumer:
