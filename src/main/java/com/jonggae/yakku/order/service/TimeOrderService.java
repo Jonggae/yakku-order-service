@@ -6,12 +6,10 @@ import com.jonggae.yakku.exceptions.ExternalServiceException;
 import com.jonggae.yakku.exceptions.InsufficientStockException;
 import com.jonggae.yakku.order.controller.PaymentClient;
 import com.jonggae.yakku.order.controller.ProductClient;
-import com.jonggae.yakku.order.dto.OrderDto;
-import com.jonggae.yakku.order.dto.PaymentRequestDto;
-import com.jonggae.yakku.order.dto.PaymentResult;
-import com.jonggae.yakku.order.dto.ProductDto;
+import com.jonggae.yakku.order.dto.*;
 import com.jonggae.yakku.order.entity.Order;
 import com.jonggae.yakku.order.entity.OrderItem;
+import com.jonggae.yakku.order.entity.OrderResult;
 import com.jonggae.yakku.order.entity.OrderStatus;
 import com.jonggae.yakku.order.feignDto.StockReservationRequestDto;
 import com.jonggae.yakku.order.repository.OrderRepository;
@@ -41,7 +39,6 @@ public class TimeOrderService {
     private final OrderRepository orderRepository;
     private final RedissonClient redissonClient;
 
-    // 실패 요청 처리
     private final ExecutorService executorService = Executors.newFixedThreadPool(100);
     private final AtomicBoolean stockExhausted = new AtomicBoolean(false);
 
@@ -50,57 +47,60 @@ public class TimeOrderService {
     private static final long LOCK_LEASE_TIME = 5000;
 
     @Transactional
-    public OrderDto createTimeOrder(Long customerId, Long productId, Long quantity) {
-        if (stockExhausted.get()) {
-            throw new InsufficientStockException("재고가 모두 소진되었습니다");
-        }
-        // 상품 정보 조회 (락 없이 수행)
-        ProductDto product = productClient.getProductOrderInfo(productId);
+    public OrderResponse createTimeOrder(Long customerId, Long productId, Long quantity) {
+        log.info("주문 시작 - CustomerId: {}, ProductId: {}, Quantity: {}", customerId, productId, quantity);
 
+        if (stockExhausted.get()) {
+            log.warn("재고 소진 - CustomerId: {}, ProductId: {}", customerId, productId);
+            return new OrderResponse(null, OrderResult.STOCK_INSUFFICIENT);
+        }
+
+        ProductDto product = productClient.getProductOrderInfo(productId);
         RLock lock = redissonClient.getLock(LOCK_PREFIX + productId);
         boolean stockReserved = false;
 
         try {
-            // 락 획득 시도 (재고 확인 및 감소에만 적용)
             if (lock.tryLock(LOCK_WAIT_TIME, LOCK_LEASE_TIME, TimeUnit.MILLISECONDS)) {
                 try {
                     stockReserved = productClient.reserveStock(productId, new StockReservationRequestDto(quantity));
                     if (!stockReserved) {
-                        throw new InsufficientStockException("재고가 부족합니다");
+                        log.warn("재고 부족 - CustomerId: {}, ProductId: {}, Quantity: {}", customerId, productId, quantity);
+                        return new OrderResponse(null, OrderResult.STOCK_INSUFFICIENT);
                     }
                 } finally {
                     lock.unlock();
                 }
             } else {
-                throw new ConcurrentOrderException("다른 주문 처리 중");
-            }
-            if (!stockReserved) {
-                stockExhausted.set(true);
-                throw new InsufficientStockException("재고가 부족합니다");
+                log.warn("동시 주문 충돌 - CustomerId: {}, ProductId: {}", customerId, productId);
+                return new OrderResponse(null, OrderResult.CONCURRENT_ORDER_CONFLICT);
             }
 
-            // 주문 생성 (락 없이 수행)
             Order order = createOrder(customerId, product, quantity);
             Order savedOrder = orderRepository.save(order);
+            log.info("주문 생성 - OrderId: {}, CustomerId: {}", savedOrder.getId(), customerId);
 
-            // 결제 처리 (락 없이 수행)
             PaymentResult paymentResult = processPayment(savedOrder.getId());
+            log.info("결제 처리 결과 - OrderId: {}, Result: {}", savedOrder.getId(), paymentResult);
 
-            // 주문 상태 업데이트 (락 없이 수행)
-            updateOrderStatus(savedOrder, paymentResult, productId, quantity);
+            OrderStatus finalStatus = updateOrderStatus(savedOrder, paymentResult, productId, quantity);
+            log.info("주문 상태 업데이트 - OrderId: {}, FinalStatus: {}", savedOrder.getId(), finalStatus);
 
             Order updatedOrder = orderRepository.save(savedOrder);
-            return OrderDto.from(updatedOrder);
+            OrderDto orderDto = OrderDto.from(updatedOrder);
+            OrderResult result = (finalStatus == OrderStatus.PAYMENT_COMPLETE) ? OrderResult.SUCCESS : OrderResult.PAYMENT_FAILED;
+
+            return new OrderResponse(orderDto, result);
 
         } catch (InterruptedException e) {
+            log.error("락 획득 중 인터럽트 발생 - CustomerId: {}, ProductId: {}", customerId, productId);
             Thread.currentThread().interrupt();
-            throw new ConcurrentOrderException("락 획득 중 인터럽트 발생");
+            return new OrderResponse(null, OrderResult.CONCURRENT_ORDER_CONFLICT);
         } catch (FeignException e) {
-            log.error("외부 서비스 통신 간 오류", e);
+            log.error("외부 서비스 통신 오류 - CustomerId: {}, ProductId: {}", customerId, productId, e);
             if (stockReserved) {
                 productClient.cancelStockReservation(productId, quantity);
             }
-            throw new ExternalServiceException("외부 서비스 통신 중 오류가 발생했습니다");
+            return new OrderResponse(null, OrderResult.EXTERNAL_SERVICE_ERROR);
         }
     }
 
@@ -129,7 +129,7 @@ public class TimeOrderService {
         return paymentClient.processPayment(paymentRequestDto);
     }
 
-    private void updateOrderStatus(Order order, PaymentResult paymentResult, Long productId, Long quantity) {
+    private OrderStatus updateOrderStatus(Order order, PaymentResult paymentResult, Long productId, Long quantity) {
         if (paymentResult == PaymentResult.SUCCESS) {
             order.setOrderStatus(OrderStatus.PAYMENT_COMPLETE);
             productClient.confirmStockReservation(productId, quantity);
@@ -137,15 +137,16 @@ public class TimeOrderService {
             order.setOrderStatus(OrderStatus.PAYMENT_FAILED);
             productClient.cancelStockReservation(productId, quantity);
         }
+        return order.getOrderStatus();
     }
 
-    public CompletableFuture<OrderDto> createTimeOrderAsync(Long customerId, Long productId, Long quantity) {
+    public CompletableFuture<OrderResponse> createTimeOrderAsync(Long customerId, Long productId, Long quantity) {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 return createTimeOrder(customerId, productId, quantity);
             } catch (Exception e) {
-                log.error("주문 처리 중 오류 발생", e);
-                throw new CompletionException(e);
+                log.error("주문 처리 중 예외 발생", e);
+                return new OrderResponse(null, OrderResult.EXTERNAL_SERVICE_ERROR);
             }
         }, executorService);
     }
@@ -154,7 +155,6 @@ public class TimeOrderService {
         stockExhausted.set(false);
     }
 
-    // ExecutorService 종료 메소드 추가
     @PreDestroy
     public void shutdownExecutorService() {
         executorService.shutdown();
